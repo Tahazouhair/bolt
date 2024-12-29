@@ -29,10 +29,11 @@ const QCFailure = () => {
   const [currentUndecidedIndex, setCurrentUndecidedIndex] = useState(0);
   const caseRefs = useRef({});
 
-  const sheetId = "19C-B-FiTNl1dirDg0H_5udNveCnlNPbF6LYyTp7M2L4";
-  const range = "Final view!A1:E";
-  const brandsRange = "Brands!A2:B";
-  const apiKey = "AIzaSyCgtKWUO_ccJi9u6eVhNadOrTmsbYzQcg8";
+  // Get configuration from environment variables
+  const sheetId = process.env.REACT_APP_SHEET_ID;
+  const range = process.env.REACT_APP_SHEET_RANGE;
+  const brandsRange = process.env.REACT_APP_BRANDS_RANGE;
+  const apiKey = process.env.REACT_APP_API_KEY;
 
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
   const MAX_RETRIES = 3;

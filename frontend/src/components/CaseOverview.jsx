@@ -28,7 +28,7 @@ const CaseOverview = ({ initialFilter }) => {
     const [selectedAgent, setSelectedAgent] = useState('');
     const POLLING_INTERVAL = 30000; // Poll every 30 seconds
 
-    const sheetId = process.env.REACT_APP_SHEET_ID;
+    const sheetId = process.env.REACT_APP_CASES_SHEET_ID;
     const apiKey = process.env.REACT_APP_API_KEY;
     const range = 'Unassigned Cases!A1:M';
 

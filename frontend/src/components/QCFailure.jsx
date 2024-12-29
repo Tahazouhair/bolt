@@ -30,7 +30,7 @@ const QCFailure = () => {
   const caseRefs = useRef({});
 
   // Get configuration from environment variables
-  const sheetId = process.env.REACT_APP_SHEET_ID;
+  const sheetId = process.env.REACT_APP_QC_SHEET_ID;
   const range = process.env.REACT_APP_SHEET_RANGE;
   const brandsRange = process.env.REACT_APP_BRANDS_RANGE;
   const apiKey = process.env.REACT_APP_API_KEY;

@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createHashRouter } from 'react-router-dom';
 import App from './App';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -6,9 +6,9 @@ import Champs from './components/Champs';
 import CaseOverview from './components/CaseOverview';
 import AccessDenied from './components/AccessDenied';
 
-const router = createBrowserRouter([
+const router = createHashRouter([
   {
-    path: "/bolt",
+    path: "/",
     element: <App />,
     children: [
       {

@@ -22,16 +22,29 @@ CORS(app,
 )
 
 # Configuration
-app.config['SECRET_KEY'] = 'your-secret-key'  # Change this to a secure secret key
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///dashboard.db'
+print("Loading configuration...")
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///dashboard.db')
+if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
+    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
+print(f"Database URL: {app.config['SQLALCHEMY_DATABASE_URI']}")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize extensions
+print("Initializing database...")
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 
 def init_db():
+    print("Running database initialization...")
+    try:
+        db.create_all()
+        print("Database tables created successfully")
+    except Exception as e:
+        print(f"Error creating database tables: {str(e)}")
+
+def init_scrape_cache():
     conn = sqlite3.connect('scrape_cache.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS scrape_cache
@@ -41,6 +54,7 @@ def init_db():
 
 # Initialize the database
 init_db()
+init_scrape_cache()
 
 # Models
 class User(UserMixin, db.Model):

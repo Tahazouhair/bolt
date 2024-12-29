@@ -2,7 +2,7 @@
   "name": "bolt-dashboard",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://tahazouhair.github.io/bolt",
+  "homepage": "https://boltdashboard.me",
   "dependencies": {
     "@headlessui/react": "^1.7.19",
     "@heroicons/react": "^2.2.0",

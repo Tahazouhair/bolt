@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 import json
 import sqlite3
 from datetime import datetime, timedelta
+import time
 
 app = Flask(__name__)
 CORS(app, 
@@ -24,10 +25,16 @@ CORS(app,
 # Configuration
 print("Loading configuration...")
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///dashboard.db')
-if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
-    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
-print(f"Database URL: {app.config['SQLALCHEMY_DATABASE_URI']}")
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///dashboard.db')
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+# Add SSL mode to PostgreSQL URL if not already present
+if 'postgresql://' in database_url and '?' not in database_url:
+    database_url += '?sslmode=require'
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+print(f"Database URL: {database_url}")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize extensions
@@ -38,11 +45,24 @@ login_manager.init_app(app)
 
 def init_db():
     print("Running database initialization...")
-    try:
-        db.create_all()
-        print("Database tables created successfully")
-    except Exception as e:
-        print(f"Error creating database tables: {str(e)}")
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        try:
+            with app.app_context():
+                db.create_all()
+                print("Database tables created successfully")
+                return True
+        except Exception as e:
+            retry_count += 1
+            print(f"Error creating database tables (attempt {retry_count}/{max_retries}): {str(e)}")
+            if retry_count < max_retries:
+                print("Retrying in 5 seconds...")
+                time.sleep(5)
+            else:
+                print("Max retries reached. Database initialization failed.")
+                return False
 
 def init_scrape_cache():
     conn = sqlite3.connect('scrape_cache.db')

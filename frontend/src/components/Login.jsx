@@ -16,10 +16,22 @@ const Login = () => {
     setLoading(true);
     setError('');
     
+    console.log('Attempting login...');
+    console.log('API URL:', API_URL);
+    
     try {
-      const response = await axios.post(`${API_URL}/api/login`, credentials);
+      console.log('Making request to:', `${API_URL}/api/login`);
+      const response = await axios.post(`${API_URL}/api/login`, credentials, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        withCredentials: true
+      });
+      
+      console.log('Response received:', response);
       
       if (response.data?.token) {
+        console.log('Token received, storing in localStorage');
         localStorage.setItem('token', response.data.token);
         if (response.data.user) {
           localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -27,16 +39,26 @@ const Login = () => {
         setIsAuthenticated(true);
         navigate('/dashboard');
       } else {
+        console.error('No token in response:', response.data);
         setError('Invalid response from server');
       }
     } catch (err) {
-      if (err.response?.status === 401) {
-        setError('Invalid username or password');
-      } else if (err.response?.data?.message) {
-        setError(err.response.data.message);
-      } else if (err.message === 'Network Error') {
+      console.error('Login error:', err);
+      
+      if (err.response) {
+        console.error('Error response:', err.response);
+        if (err.response.status === 401) {
+          setError('Invalid username or password');
+        } else if (err.response.data?.message) {
+          setError(err.response.data.message);
+        } else {
+          setError(`Server error: ${err.response.status}`);
+        }
+      } else if (err.request) {
+        console.error('No response received:', err.request);
         setError('Unable to connect to server. Please try again later.');
       } else {
+        console.error('Error setting up request:', err.message);
         setError('An unexpected error occurred. Please try again.');
       }
     } finally {
@@ -48,15 +70,28 @@ const Login = () => {
     setLoading(true);
     setError('');
     
+    console.log('Setting up admin account...');
+    
     try {
-      await axios.post(`${API_URL}/api/setup-admin`, {
+      const response = await axios.post(`${API_URL}/api/setup-admin`, {
         username: 'admin',
         password: 'admin123'
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        withCredentials: true
       });
+      
+      console.log('Admin setup response:', response);
       setError('Admin account created successfully. Please login.');
     } catch (err) {
+      console.error('Admin setup error:', err);
+      
       if (err.response?.data?.message) {
         setError(err.response.data.message);
+      } else if (err.request) {
+        setError('Unable to connect to server. Please try again later.');
       } else {
         setError('Failed to setup admin account');
       }

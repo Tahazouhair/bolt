@@ -8,7 +8,7 @@ import AccessDenied from './components/AccessDenied';
 
 const router = createBrowserRouter([
   {
-    path: '/',
+    path: "/bolt",
     element: <App />,
     children: [
       {

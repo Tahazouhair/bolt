@@ -15,11 +15,15 @@ from datetime import datetime, timedelta
 import time
 
 app = Flask(__name__)
-CORS(app, 
-    origins=["http://localhost:3000", "http://localhost:3001", "https://tahazouhair.github.io"],
-    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
-    supports_credentials=True
+CORS(app,
+    resources={r"/api/*": {
+        "origins": ["http://localhost:3000", "http://localhost:3001", "https://tahazouhair.github.io", "https://bolt-backend-xu7f.onrender.com"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "expose_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True,
+        "send_wildcard": False
+    }}
 )
 
 # Configuration
@@ -154,21 +158,36 @@ def clean_brand_name(brand_name):
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    
-    if not data or 'username' not in data or 'password' not in data:
-        return jsonify({'message': 'Missing username or password'}), 400
+    try:
+        print("Login attempt received")
+        data = request.get_json()
         
-    print(f"Login attempt for username: {data['username']}")  # Debug log
-    
-    user = User.query.filter_by(username=data['username']).first()
-    print(f"User found: {user is not None}")  # Debug log
-    
-    if user and check_password_hash(user.password, data['password']):
-        print("Password verified successfully")  # Debug log
+        if not data:
+            print("No JSON data received")
+            return jsonify({'message': 'No data provided'}), 400
+            
+        if 'username' not in data or 'password' not in data:
+            print("Missing username or password")
+            return jsonify({'message': 'Missing username or password'}), 400
+            
+        username = data['username']
+        password = data['password']
+        
+        print(f"Attempting login for user: {username}")
+        user = User.query.filter_by(username=username).first()
+        
+        if not user:
+            print(f"User not found: {username}")
+            return jsonify({'message': 'Invalid username or password'}), 401
+            
+        if not check_password_hash(user.password, password):
+            print(f"Invalid password for user: {username}")
+            return jsonify({'message': 'Invalid username or password'}), 401
+            
+        print(f"Login successful for user: {username}")
         token = jwt.encode({
             'user_id': user.id,
-            'exp': datetime.utcnow() + timedelta(hours=24)
+            'exp': datetime.utcnow() + timedelta(days=1)
         }, app.config['SECRET_KEY'])
         
         # Log the successful login
@@ -179,14 +198,13 @@ def login():
         return jsonify({
             'token': token,
             'user': {
-                'id': user.id,
                 'username': user.username,
                 'role': user.role
             }
         })
-    
-    print("Invalid credentials")  # Debug log
-    return jsonify({'message': 'Invalid credentials'}), 401
+    except Exception as e:
+        print(f"Error during login: {str(e)}")
+        return jsonify({'message': 'Server error during login. Please try again.'}), 500
 
 @app.route('/api/logout', methods=['POST'])
 @token_required

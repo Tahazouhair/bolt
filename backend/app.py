@@ -14,16 +14,12 @@ import sqlite3
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
-CORS(app, resources={
-    r"/api/*": {
-        "origins": ["http://localhost:3000", "http://localhost:3001", "https://tahazouhair.github.io"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
-        "expose_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": True,
-        "max_age": 3600
-    }
-})
+CORS(app, 
+    origins=["http://localhost:3000", "http://localhost:3001", "https://tahazouhair.github.io"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+    supports_credentials=True
+)
 
 # Configuration
 app.config['SECRET_KEY'] = 'your-secret-key'  # Change this to a secure secret key

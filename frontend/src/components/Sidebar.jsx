@@ -54,6 +54,7 @@ const Sidebar = ({ activeTab, setActiveTab, userRole }) => {
       name: 'QC Failure',
       icon: ClockIcon,
       tab: 'qc-failure',
+      hidden: true,
       subItems: [
         {
           name: 'Order Number Cleaner',
@@ -98,6 +99,10 @@ const Sidebar = ({ activeTab, setActiveTab, userRole }) => {
         <div className="mt-5 flex flex-grow flex-col">
           <nav className="flex-1 space-y-1 px-2 pb-4">
             {navigation.map((item) => {
+              if (item.hidden) {
+                return null;
+              }
+
               if (item.requireAdmin && userRole !== 'admin') {
                 return null;
               }

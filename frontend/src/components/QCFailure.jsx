@@ -64,33 +64,22 @@ const QCFailure = () => {
   };
 
   const getProductUrl = (sku) => {
-    return getSKULink(sku);
+    return `https://ounass.ae/${sku}.html`;
   };
 
-  const scrapeBrandName = async (url) => {
+  const scrapeBrandName = async (sku) => {
     try {
-      console.log('Fetching brand info for:', url);
-      const response = await fetch(url);
+      console.log('Fetching brand info for:', sku);
+      const response = await fetch(getSKULink(sku));
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      
-      // Extract brand name - using Ounass specific selectors
-      let brand = null;
-      if (data.brand) {
-        brand = data.brand;
-      }
-      
-      // Extract price - using Ounass specific selectors
-      let price = null;
-      if (data.price) {
-        price = data.price;
-      }
-      
-      console.log('Scraped data:', { brand, price });
-      return { brand, price };
+      return {
+        brand: data.brand,
+        price: data.price
+      };
     } catch (error) {
       console.error('Error scraping details:', error);
       return { brand: null, price: null };
@@ -104,12 +93,12 @@ const QCFailure = () => {
     for (let i = 0; i < uniqueProducts.length; i += batchSize) {
       const batch = uniqueProducts.slice(i, i + batchSize);
       const promises = batch.map(async (sku) => {
-        const url = getProductUrl(sku);
+        const url = getSKULink(sku);
         // Check if we already have the data in state or localStorage
         if (brandNames[url] && productPrices[url]) {
           return;
         }
-        const { brand, price } = await scrapeBrandName(url);
+        const { brand, price } = await scrapeBrandName(sku);
         if (brand) {
           setBrandNames(prev => {
             const updated = {
@@ -347,7 +336,7 @@ const QCFailure = () => {
     const exportData = casesToExport.map(caseItem => {
       // Get all products for this case
       const products = caseItem.products.map(sku => {
-        const url = getProductUrl(sku);
+        const url = getSKULink(sku);
         const brand = brandNames[url] || '';
         const isLuxury = brand ? isLuxuryBrand(brand) : false;
         const decision = decisions[caseItem.id] || { status: 'Undecided', agent: 'N/A', date: 'N/A' };
@@ -393,21 +382,21 @@ const QCFailure = () => {
     XLSX.writeFile(wb, fileName);
   };
 
-  const handleLinkClick = async (caseId, event, url) => {
+  const handleLinkClick = async (caseId, event, sku) => {
     event.preventDefault();
     setActiveCaseId(caseId);
     
     try {
       // Only scrape if we haven't already
-      if (!brandNames[url] || !productPrices[url]) {
-        console.log('Fetching brand name and price for:', url);
-        const { brand, price } = await scrapeBrandName(url);
+      if (!brandNames[getSKULink(sku)] || !productPrices[getSKULink(sku)]) {
+        console.log('Fetching brand name and price for:', sku);
+        const { brand, price } = await scrapeBrandName(sku);
         console.log('Received brand name and price:', brand, price);
         if (brand) {
           setBrandNames(prev => {
             const updated = {
               ...prev,
-              [url]: brand
+              [getSKULink(sku)]: brand
             };
             localStorage.setItem('brandNames', JSON.stringify(updated));
             return updated;
@@ -417,7 +406,7 @@ const QCFailure = () => {
           setProductPrices(prev => {
             const updated = {
               ...prev,
-              [url]: price
+              [getSKULink(sku)]: price
             };
             localStorage.setItem('productPrices', JSON.stringify(updated));
             return updated;
@@ -428,7 +417,7 @@ const QCFailure = () => {
       console.error('Error in handleLinkClick:', error);
     }
     
-    window.open(url, '_blank');
+    window.open(getProductUrl(sku), '_blank');
   };
 
   const handleSelectAll = (e) => {
@@ -480,7 +469,7 @@ const QCFailure = () => {
     if (showLuxuryOnly) {
       // Check if any product in the case has a luxury brand
       return matchesSearch && caseData.products.some(sku => {
-        const url = getProductUrl(sku);
+        const url = getSKULink(sku);
         const brand = brandNames[url];
         return brand && isLuxuryBrand(brand);
       });
@@ -769,14 +758,14 @@ const QCFailure = () => {
                                     {product}
                                   </a>
                                   <div className="flex items-center flex-grow border-l border-gray-200">
-                                    {brandNames[getProductUrl(product)] && (
+                                    {brandNames[getSKULink(product)] && (
                                       <div className="px-3 py-1.5 text-xs font-medium text-gray-600 border-r border-gray-200 flex-grow">
-                                        {brandNames[getProductUrl(product)]}
+                                        {brandNames[getSKULink(product)]}
                                       </div>
                                     )}
-                                    {productPrices[getProductUrl(product)] && (
+                                    {productPrices[getSKULink(product)] && (
                                       <span className="px-3 py-1.5 text-xs font-semibold text-emerald-600 whitespace-nowrap">
-                                        {productPrices[getProductUrl(product)]}
+                                        {productPrices[getSKULink(product)]}
                                       </span>
                                     )}
                                   </div>

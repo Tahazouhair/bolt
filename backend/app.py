@@ -614,6 +614,32 @@ def scrape_brand():
         if 'conn' in locals():
             conn.close()
 
+@app.route('/api/sku/<sku>', methods=['GET'])
+def get_sku_info(sku):
+    try:
+        url = f'https://ounass.ae/{sku}.html'
+        response = requests.get(url)
+        if response.status_code != 200:
+            return jsonify({'error': 'Product not found'}), 404
+            
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Extract brand name
+        brand_element = soup.select_one('.product-brand-name, [data-testid="brand-name"], .brand-link')
+        brand = brand_element.text.strip() if brand_element else None
+        
+        # Extract price
+        price_element = soup.select_one('.product-price, [data-testid="product-price"], .price-sales')
+        price = price_element.text.strip() if price_element else None
+        
+        return jsonify({
+            'brand': brand,
+            'price': price,
+            'url': url
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # Create the database tables
 with app.app_context():
     try:

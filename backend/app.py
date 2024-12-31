@@ -15,7 +15,15 @@ from datetime import datetime, timedelta
 import time
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, 
+     resources={r"/*": {
+         "origins": ["http://localhost:3000", "https://tahazouhair.github.io"],
+         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         "allow_headers": ["Content-Type", "Authorization"],
+         "expose_headers": ["Content-Type", "Authorization"],
+         "supports_credentials": True
+     }}
+)
 
 # Configuration
 print("Loading configuration...")
@@ -37,6 +45,20 @@ print("Initializing database...")
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
+
+# Error handlers
+@app.errorhandler(500)
+def internal_error(error):
+    print(f"Internal Server Error: {str(error)}")
+    return jsonify({'message': 'Internal server error. Please try again later.'}), 500
+
+@app.errorhandler(404)
+def not_found_error(error):
+    return jsonify({'message': 'Resource not found'}), 404
+
+@app.errorhandler(401)
+def unauthorized_error(error):
+    return jsonify({'message': 'Unauthorized. Please log in.'}), 401
 
 def init_db():
     print("Running database initialization...")
@@ -165,7 +187,12 @@ def login():
         password = data['password']
         
         print(f"Attempting login for user: {username}")
-        user = User.query.filter_by(username=username).first()
+        
+        try:
+            user = User.query.filter_by(username=username).first()
+        except Exception as db_error:
+            print(f"Database error during user lookup: {str(db_error)}")
+            return jsonify({'message': 'Database error. Please try again later.'}), 500
         
         if not user:
             print(f"User not found: {username}")
@@ -176,23 +203,28 @@ def login():
             return jsonify({'message': 'Invalid username or password'}), 401
             
         print(f"Login successful for user: {username}")
-        token = jwt.encode({
-            'user_id': user.id,
-            'exp': datetime.utcnow() + timedelta(days=1)
-        }, app.config['SECRET_KEY'])
-        
-        # Log the successful login
-        new_activity = Activity(user_id=user.id, action='User logged in')
-        db.session.add(new_activity)
-        db.session.commit()
-        
-        return jsonify({
-            'token': token,
-            'user': {
-                'username': user.username,
-                'role': user.role
-            }
-        })
+        try:
+            token = jwt.encode({
+                'user_id': user.id,
+                'exp': datetime.utcnow() + timedelta(days=1)
+            }, app.config['SECRET_KEY'])
+            
+            # Log the successful login
+            new_activity = Activity(user_id=user.id, action='User logged in')
+            db.session.add(new_activity)
+            db.session.commit()
+            
+            return jsonify({
+                'token': token,
+                'user': {
+                    'username': user.username,
+                    'role': user.role
+                }
+            })
+        except Exception as token_error:
+            print(f"Error generating token: {str(token_error)}")
+            return jsonify({'message': 'Error during login process. Please try again.'}), 500
+            
     except Exception as e:
         print(f"Error during login: {str(e)}")
         return jsonify({'message': 'Server error during login. Please try again.'}), 500

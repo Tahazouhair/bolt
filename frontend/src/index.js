@@ -1,8 +1,12 @@
 import React, { startTransition } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
+import axios from 'axios';
 import './index.css';
 import router from './router';
+
+// Configure axios defaults
+axios.defaults.withCredentials = false;
 
 // Disable console.log in production
 if (process.env.NODE_ENV === 'production') {

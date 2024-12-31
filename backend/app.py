@@ -15,16 +15,7 @@ from datetime import datetime, timedelta
 import time
 
 app = Flask(__name__)
-CORS(app,
-    resources={r"/api/*": {
-        "origins": ["http://localhost:3000", "http://localhost:3001", "https://tahazouhair.github.io", "https://bolt-backend-xu7f.onrender.com"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
-        "expose_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": True,
-        "send_wildcard": False
-    }}
-)
+CORS(app)
 
 # Configuration
 print("Loading configuration...")

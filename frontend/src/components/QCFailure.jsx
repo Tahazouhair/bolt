@@ -44,38 +44,27 @@ const QCFailure = () => {
     try {
       const response = await fetch(url, options);
       
-      if (response.status === 429) {
-        if (retryCount >= MAX_RETRIES) {
-          throw new Error('Max retries reached for rate limit');
-        }
-        
-        // Exponential backoff with jitter
-        const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount) + Math.random() * 1000;
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
-        return fetchWithRetry(url, options, retryCount + 1);
-      }
-      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return response.json();
+      return await response.json();
     } catch (error) {
-      if (retryCount >= MAX_RETRIES) {
-        throw error;
+      if (retryCount < MAX_RETRIES) {
+        const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return fetchWithRetry(url, options, retryCount + 1);
       }
-      
-      // Exponential backoff for network errors
-      const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
-      return fetchWithRetry(url, options, retryCount + 1);
+      throw error;
     }
   };
 
+  const getSKULink = (sku) => {
+    return `${apiUrl}/api/sku/${sku}`;
+  };
+
   const getProductUrl = (sku) => {
-    return `https://ounass.ae/${sku}.html`;
+    return getSKULink(sku);
   };
 
   const scrapeBrandName = async (url) => {
@@ -86,24 +75,18 @@ const QCFailure = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const html = await response.text();
-      
-      // Create a temporary element to parse the HTML
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
+      const data = await response.json();
       
       // Extract brand name - using Ounass specific selectors
       let brand = null;
-      const brandElement = doc.querySelector('.product-brand-name, [data-testid="brand-name"], .brand-link');
-      if (brandElement) {
-        brand = brandElement.textContent.trim();
+      if (data.brand) {
+        brand = data.brand;
       }
       
       // Extract price - using Ounass specific selectors
       let price = null;
-      const priceElement = doc.querySelector('.product-price, [data-testid="product-price"], .price-sales');
-      if (priceElement) {
-        price = priceElement.textContent.trim();
+      if (data.price) {
+        price = data.price;
       }
       
       console.log('Scraped data:', { brand, price });

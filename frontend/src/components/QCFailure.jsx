@@ -34,6 +34,7 @@ const QCFailure = () => {
   const range = process.env.REACT_APP_SHEET_RANGE;
   const brandsRange = process.env.REACT_APP_BRANDS_RANGE;
   const apiKey = process.env.REACT_APP_API_KEY;
+  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
   const MAX_RETRIES = 3;
@@ -73,72 +74,88 @@ const QCFailure = () => {
     }
   };
 
-  const getProductUrl = (sku) => `https://ounass.ae/${sku}.html`;
+  const getProductUrl = (sku) => {
+    const baseUrl = `https://ounass.ae/${sku}.html`;
+    // Use allorigins with /get endpoint instead of /raw to get JSON response
+    return `https://api.allorigins.win/get?url=${encodeURIComponent(baseUrl)}`;
+  };
 
   const scrapeBrandName = async (url) => {
     try {
-      const response = await fetch('http://localhost:5000/api/scrape-brand', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url }),
-        credentials: 'include',
-      });
+      console.log('Fetching brand info for:', url);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const data = await response.json();
-      if (data.brand || data.price) {
-        return {
-          brand: data.brand,
-          price: data.price
-        };
+      const html = data.contents; // Extract HTML content from allorigins JSON response
+      
+      // Create a temporary element to parse the HTML
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      
+      // Extract brand name - using Ounass specific selectors
+      let brand = null;
+      const brandElement = doc.querySelector('.product-brand-name, [data-testid="brand-name"], .brand-link');
+      if (brandElement) {
+        brand = brandElement.textContent.trim();
       }
+      
+      // Extract price - using Ounass specific selectors
+      let price = null;
+      const priceElement = doc.querySelector('.product-price, [data-testid="product-price"], .price-sales');
+      if (priceElement) {
+        price = priceElement.textContent.trim();
+      }
+      
+      console.log('Scraped data:', { brand, price });
+      return { brand, price };
     } catch (error) {
-      console.error('Error scraping brand:', error);
+      console.error('Error scraping details:', error);
+      return { brand: null, price: null };
     }
-    return { brand: null, price: null };
   };
 
   const fetchBrandNames = async (products) => {
     const uniqueProducts = [...new Set(products)];
-    const batchSize = 5; // Process 5 products at a time
+    const batchSize = 2; // Reduce batch size to avoid rate limiting
     
     for (let i = 0; i < uniqueProducts.length; i += batchSize) {
       const batch = uniqueProducts.slice(i, i + batchSize);
       const promises = batch.map(async (sku) => {
         const url = getProductUrl(sku);
-        // Check if we already have the data in state
+        // Check if we already have the data in state or localStorage
         if (brandNames[url] && productPrices[url]) {
           return;
         }
         const { brand, price } = await scrapeBrandName(url);
-        if (brand || price) {
-          if (brand) {
-            setBrandNames(prev => {
-              const updated = {
-                ...prev,
-                [url]: brand
-              };
-              localStorage.setItem('brandNames', JSON.stringify(updated));
-              return updated;
-            });
-          }
-          if (price) {
-            setProductPrices(prev => {
-              const updated = {
-                ...prev,
-                [url]: price
-              };
-              localStorage.setItem('productPrices', JSON.stringify(updated));
-              return updated;
-            });
-          }
+        if (brand) {
+          setBrandNames(prev => {
+            const updated = {
+              ...prev,
+              [url]: brand
+            };
+            localStorage.setItem('brandNames', JSON.stringify(updated));
+            return updated;
+          });
+        }
+        if (price) {
+          setProductPrices(prev => {
+            const updated = {
+              ...prev,
+              [url]: price
+            };
+            localStorage.setItem('productPrices', JSON.stringify(updated));
+            return updated;
+          });
         }
       });
+      
       await Promise.all(promises);
-      // Small delay between batches to prevent rate limiting
+      // Longer delay between batches to be more respectful to the server
       if (i + batchSize < uniqueProducts.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
   };
@@ -290,23 +307,6 @@ const QCFailure = () => {
       }
     }
     return false;
-  };
-
-  const BrandDisplay = ({ brand }) => {
-    if (!brand) return null;
-    
-    const isLuxury = isLuxuryBrand(brand);
-    
-    return (
-      <div className="flex items-center gap-2">
-        <span>{brand}</span>
-        {isLuxury && (
-          <span className="px-2 py-0.5 text-xs font-semibold rounded bg-yellow-100 text-yellow-800 border border-yellow-400">
-            LUX
-          </span>
-        )}
-      </div>
-    );
   };
 
   const handleDecisionChange = (caseId, decision) => {
@@ -524,17 +524,21 @@ const QCFailure = () => {
 
   useEffect(() => {
     const fetchBrandsForCases = async () => {
+      console.log('Fetching brands for cases:', cases);
       const allProducts = new Set();
       cases.forEach(caseItem => {
         caseItem.products?.forEach(p => allProducts.add(p));
       });
       
       if (allProducts.size > 0) {
+        console.log('Found products:', [...allProducts]);
         await fetchBrandNames([...allProducts]);
       }
     };
 
-    fetchBrandsForCases();
+    if (cases.length > 0) {
+      fetchBrandsForCases();
+    }
   }, [cases]); // Only run when cases change
 
   useEffect(() => {
@@ -787,7 +791,7 @@ const QCFailure = () => {
                                   <div className="flex items-center flex-grow border-l border-gray-200">
                                     {brandNames[getProductUrl(product)] && (
                                       <div className="px-3 py-1.5 text-xs font-medium text-gray-600 border-r border-gray-200 flex-grow">
-                                        <BrandDisplay brand={brandNames[getProductUrl(product)]} />
+                                        {brandNames[getProductUrl(product)]}
                                       </div>
                                     )}
                                     {productPrices[getProductUrl(product)] && (

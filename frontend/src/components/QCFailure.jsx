@@ -75,9 +75,7 @@ const QCFailure = () => {
   };
 
   const getProductUrl = (sku) => {
-    const baseUrl = `https://ounass.ae/${sku}.html`;
-    // Use allorigins with /get endpoint instead of /raw to get JSON response
-    return `https://api.allorigins.win/get?url=${encodeURIComponent(baseUrl)}`;
+    return `https://ounass.ae/${sku}.html`;
   };
 
   const scrapeBrandName = async (url) => {
@@ -88,8 +86,7 @@ const QCFailure = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const data = await response.json();
-      const html = data.contents; // Extract HTML content from allorigins JSON response
+      const html = await response.text();
       
       // Create a temporary element to parse the HTML
       const parser = new DOMParser();

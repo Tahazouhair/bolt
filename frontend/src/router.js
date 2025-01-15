@@ -28,6 +28,7 @@ const router = createHashRouter([
         path: '/champs',
         element: <Champs />,
       },
+      // Case Overview Routes
       {
         path: '/case-overview',
         element: <CaseOverview />,
@@ -35,6 +36,68 @@ const router = createHashRouter([
       {
         path: '/case-overview/all',
         element: <CaseOverview initialFilter="all" />,
+      },
+      {
+        path: '/case-overview/assigned',
+        element: <CaseOverview initialFilter="assigned" />,
+      },
+      {
+        path: '/case-overview/unassigned',
+        element: <CaseOverview initialFilter="unassigned" />,
+      },
+      {
+        path: '/case-overview/other-qs',
+        element: <CaseOverview initialFilter="other-qs" />,
+      },
+      {
+        path: '/case-overview/my-cases',
+        element: <CaseOverview initialFilter="my-cases" />,
+      },
+      {
+        path: '/case-overview/high-priority',
+        element: <CaseOverview initialFilter="high-priority" />,
+      },
+      {
+        path: '/case-overview/duplicates',
+        element: <CaseOverview initialFilter="duplicates" />,
+      },
+      // QC Failure Routes
+      {
+        path: '/qc-failure/order-cleaner',
+        element: <AccessDenied />, // Placeholder until components are created
+      },
+      {
+        path: '/qc-failure/case-cleaner',
+        element: <AccessDenied />,
+      },
+      {
+        path: '/qc-failure/salesforce-query',
+        element: <AccessDenied />,
+      },
+      {
+        path: '/qc-failure/combined-id',
+        element: <AccessDenied />,
+      },
+      {
+        path: '/qc-failure/cases',
+        element: <AccessDenied />,
+      },
+      // Other Routes
+      {
+        path: '/activities',
+        element: <AccessDenied />,
+      },
+      {
+        path: '/analytics',
+        element: <AccessDenied />,
+      },
+      {
+        path: '/users',
+        element: <AccessDenied />,
+      },
+      {
+        path: '/settings',
+        element: <AccessDenied />,
       },
       {
         path: '/access-denied',

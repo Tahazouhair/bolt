@@ -11,13 +11,13 @@ const CaseOverview = ({ initialFilter }) => {
     const [selectedCases, setSelectedCases] = useState(new Set());
     const [teams, setTeams] = useState([]);
     const [filters, setFilters] = useState({
-        assigned: initialFilter === 'assigned',
-        unassigned: initialFilter === 'unassigned',
-        otherQueues: initialFilter === 'other-qs',
-        myOpenCases: initialFilter === 'my-cases',
-        highPriority: initialFilter === 'high-priority',
-        duplicates: initialFilter === 'duplicates',
-        all: !initialFilter || initialFilter === 'all', // Default to all cases if no filter specified
+        assigned: false,
+        unassigned: false,
+        otherQueues: false,
+        myOpenCases: false,
+        highPriority: false,
+        duplicates: false,
+        all: true, // Default to showing all cases
         internalFeedback: true
     });
     const [statusFilter, setStatusFilter] = useState('all');
@@ -425,19 +425,22 @@ const CaseOverview = ({ initialFilter }) => {
     const filterCases = (cases) => {
         let filteredCases = [...cases];
 
-        // Apply owner filters first
+        // For All Cases view, combine assigned and unassigned cases
+        if (filters.all) {
+            filteredCases = filteredCases.filter(caseItem => {
+                const isAssignedCase = [...tier2Members, ...supportMembers].includes(caseItem.ownerName);
+                const isUnassignedCase = caseItem.ownerName === 'Internal Queue';
+                return isAssignedCase || isUnassignedCase;
+            });
+            return filteredCases;
+        }
+
+        // For other views, apply normal filtering
         const ownerFilterKeys = ['assigned', 'unassigned', 'otherQueues', 'myOpenCases'];
         const activeOwnerFilters = Object.entries(filters)
             .filter(([key, value]) => ownerFilterKeys.includes(key) && value).length;
 
-        if (filters.all) {
-            // For "All Cases" view, show both assigned and unassigned cases
-            filteredCases = filteredCases.filter(caseItem => {
-                const isAssigned = [...tier2Members, ...supportMembers].includes(caseItem.ownerName);
-                const isUnassigned = caseItem.ownerName === 'Internal Queue';
-                return isAssigned || isUnassigned;
-            });
-        } else if (activeOwnerFilters > 0) {
+        if (activeOwnerFilters > 0) {
             filteredCases = filteredCases.filter(caseItem => {
                 if (filters.assigned) {
                     if ([...tier2Members, ...supportMembers].includes(caseItem.ownerName)) return true;

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { utils, writeFile } from 'xlsx';
-import { Link } from 'react-router-dom'; // Import Link from react-router-dom
 
 const CaseOverview = ({ initialFilter }) => {
     const [cases, setCases] = useState([]);
@@ -18,7 +17,6 @@ const CaseOverview = ({ initialFilter }) => {
         myOpenCases: initialFilter === 'my-cases',
         highPriority: initialFilter === 'high-priority',
         duplicates: initialFilter === 'duplicates',
-        caseAssignment: initialFilter === 'case-assignment',
         internalFeedback: true // default to true
     });
     const [statusFilter, setStatusFilter] = useState('all');
@@ -82,8 +80,6 @@ const CaseOverview = ({ initialFilter }) => {
                 ? 'highPriority'
                 : initialFilter === 'duplicates'
                 ? 'duplicates'
-                : initialFilter === 'case-assignment'
-                ? 'caseAssignment'
                 : initialFilter;
                 
             setFilters(prev => ({
@@ -407,21 +403,22 @@ const CaseOverview = ({ initialFilter }) => {
         return duplicateGroups.flat();
     };
 
-    const filterCases = useMemo(() => {
+    const filterCases = (cases) => {
         let filteredCases = [...cases];
 
         // Apply owner filters first
-        const ownerFilterKeys = ['assigned', 'unassigned', 'otherQueues', 'myOpenCases', 'caseAssignment'];
+        const ownerFilterKeys = ['assigned', 'unassigned', 'otherQueues', 'myOpenCases'];
         const activeOwnerFilters = Object.entries(filters)
             .filter(([key, value]) => ownerFilterKeys.includes(key) && value).length;
 
         if (activeOwnerFilters > 0) {
             filteredCases = filteredCases.filter(caseItem => {
-                if (filters.assigned && caseItem.ownerName !== 'Internal Queue' && !otherQueuesList.includes(caseItem.ownerName)) return true;
+                if (filters.assigned) {
+                    if ([...tier2Members, ...supportMembers].includes(caseItem.ownerName)) return true;
+                }
                 if (filters.unassigned && caseItem.ownerName === 'Internal Queue') return true;
                 if (filters.otherQueues && otherQueuesList.includes(caseItem.ownerName)) return true;
                 if (filters.myOpenCases && currentUser && caseItem.ownerName === currentUser.username) return true;
-                if (filters.caseAssignment) return caseItem.ownerName === 'Internal Queue' || (!otherQueuesList.includes(caseItem.ownerName));
                 return false;
             });
         }
@@ -499,7 +496,7 @@ const CaseOverview = ({ initialFilter }) => {
         }
 
         return filteredCases;
-    }, [cases, filters, selectedAgent, searchQuery, statusFilter]);
+    };
 
     const getCaseCategory = (caseItem) => {
         if (isWithinLast24Hours(caseItem.createdDate) && !hasTier2Comments(caseItem.comments || [])) {
@@ -783,7 +780,7 @@ const CaseOverview = ({ initialFilter }) => {
                                     Priority
                                 </button>
                             )}
-                            {(filters.duplicates || filters.assigned || filters.caseAssignment) && (
+                            {(filters.duplicates || filters.assigned) && (
                                 <select
                                     value={selectedAgent}
                                     onChange={(e) => setSelectedAgent(e.target.value)}
@@ -1141,38 +1138,6 @@ const CaseOverview = ({ initialFilter }) => {
                         </div>
                     )}
                 </div>
-            </div>
-            <div className="flex flex-col space-y-2">
-                <Link
-                    to="/cases/assigned"
-                    className={`flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                        initialFilter === 'assigned'
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                >
-                    <span className="truncate">Assigned Cases</span>
-                </Link>
-                <Link
-                    to="/cases/unassigned"
-                    className={`flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                        initialFilter === 'unassigned'
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                >
-                    <span className="truncate">Unassigned Cases</span>
-                </Link>
-                <Link
-                    to="/cases/case-assignment"
-                    className={`flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                        initialFilter === 'case-assignment'
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                >
-                    <span className="truncate">Case Assignment</span>
-                </Link>
             </div>
         </div>
     );

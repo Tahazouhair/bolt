@@ -47,11 +47,6 @@ const Sidebar = ({ activeTab, setActiveTab, userRole }) => {
         {
           name: 'Duplicates',
           tab: 'case-overview-duplicates'
-        },
-        {
-          name: 'Case Assignment',
-          tab: 'case-overview/case-assignment',
-          requireRole: ['admin', 'moderator']
         }
       ]
     },

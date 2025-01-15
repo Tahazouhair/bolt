@@ -50,7 +50,7 @@ const Sidebar = ({ activeTab, setActiveTab, userRole }) => {
         },
         {
           name: 'Case Assignment',
-          tab: 'case-overview-case-assignment',
+          tab: 'case-overview/case-assignment',
           requireRole: ['admin', 'moderator']
         }
       ]

@@ -17,7 +17,7 @@ const CaseOverview = ({ initialFilter }) => {
         myOpenCases: initialFilter === 'my-cases',
         highPriority: initialFilter === 'high-priority',
         duplicates: initialFilter === 'duplicates',
-        all: initialFilter === 'all' || !initialFilter, // Set all to true if no filter is provided
+        all: !initialFilter || initialFilter === 'all', // Default to all cases if no filter specified
         internalFeedback: true
     });
     const [statusFilter, setStatusFilter] = useState('all');
@@ -430,8 +430,14 @@ const CaseOverview = ({ initialFilter }) => {
         const activeOwnerFilters = Object.entries(filters)
             .filter(([key, value]) => ownerFilterKeys.includes(key) && value).length;
 
-        // Skip owner filtering if "all" filter is active or no owner filters are active
-        if (!filters.all && activeOwnerFilters > 0) {
+        if (filters.all) {
+            // For "All Cases" view, show both assigned and unassigned cases
+            filteredCases = filteredCases.filter(caseItem => {
+                const isAssigned = [...tier2Members, ...supportMembers].includes(caseItem.ownerName);
+                const isUnassigned = caseItem.ownerName === 'Internal Queue';
+                return isAssigned || isUnassigned;
+            });
+        } else if (activeOwnerFilters > 0) {
             filteredCases = filteredCases.filter(caseItem => {
                 if (filters.assigned) {
                     if ([...tier2Members, ...supportMembers].includes(caseItem.ownerName)) return true;

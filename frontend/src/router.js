@@ -10,6 +10,7 @@ const router = createHashRouter([
   {
     path: "/",
     element: <App />,
+    errorElement: <AccessDenied />,
     children: [
       {
         path: '/',

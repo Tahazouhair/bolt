@@ -17,7 +17,7 @@ const CaseOverview = ({ initialFilter }) => {
         myOpenCases: initialFilter === 'my-cases',
         highPriority: initialFilter === 'high-priority',
         duplicates: initialFilter === 'duplicates',
-        internalFeedback: true // default to true
+        internalFeedback: true
     });
     const [statusFilter, setStatusFilter] = useState('all');
     const [priorityFilter, setPriorityFilter] = useState(false);
@@ -26,11 +26,12 @@ const CaseOverview = ({ initialFilter }) => {
     const [supportMembers, setSupportMembers] = useState([]);
     const [lastUpdate, setLastUpdate] = useState(null);
     const [selectedAgent, setSelectedAgent] = useState('');
-    const POLLING_INTERVAL = 30000; // Poll every 30 seconds
 
-    const sheetId = process.env.REACT_APP_CASES_SHEET_ID;
-    const apiKey = process.env.REACT_APP_API_KEY;
-    const range = 'Unassigned Cases!A1:M';
+    // Memoize these values to prevent unnecessary re-renders
+    const POLLING_INTERVAL = useMemo(() => 30000, []); // Poll every 30 seconds
+    const sheetId = useMemo(() => process.env.REACT_APP_CASES_SHEET_ID, []);
+    const apiKey = useMemo(() => process.env.REACT_APP_API_KEY, []);
+    const range = useMemo(() => 'Unassigned Cases!A1:M', []);
 
     const otherQueuesList = [
         'LM Riyadh',

@@ -407,7 +407,7 @@ const CaseOverview = ({ initialFilter }) => {
         return duplicateGroups.flat();
     };
 
-    const filterCases = (cases) => {
+    const filterCases = useMemo(() => {
         let filteredCases = [...cases];
 
         // Apply owner filters first
@@ -417,13 +417,11 @@ const CaseOverview = ({ initialFilter }) => {
 
         if (activeOwnerFilters > 0) {
             filteredCases = filteredCases.filter(caseItem => {
-                if (filters.assigned) {
-                    if ([...tier2Members, ...supportMembers].includes(caseItem.ownerName)) return true;
-                }
+                if (filters.assigned && caseItem.ownerName !== 'Internal Queue' && !otherQueuesList.includes(caseItem.ownerName)) return true;
                 if (filters.unassigned && caseItem.ownerName === 'Internal Queue') return true;
                 if (filters.otherQueues && otherQueuesList.includes(caseItem.ownerName)) return true;
                 if (filters.myOpenCases && currentUser && caseItem.ownerName === currentUser.username) return true;
-                if (filters.caseAssignment) return true;
+                if (filters.caseAssignment) return caseItem.ownerName === 'Internal Queue' || (!otherQueuesList.includes(caseItem.ownerName));
                 return false;
             });
         }
@@ -501,7 +499,7 @@ const CaseOverview = ({ initialFilter }) => {
         }
 
         return filteredCases;
-    };
+    }, [cases, filters, selectedAgent, searchQuery, statusFilter]);
 
     const getCaseCategory = (caseItem) => {
         if (isWithinLast24Hours(caseItem.createdDate) && !hasTier2Comments(caseItem.comments || [])) {

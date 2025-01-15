@@ -33,32 +33,8 @@ const router = createHashRouter([
         element: <CaseOverview />,
       },
       {
-        path: '/case-overview-all',
+        path: '/case-overview/all',
         element: <CaseOverview initialFilter="all" />,
-      },
-      {
-        path: '/case-overview-assigned',
-        element: <CaseOverview initialFilter="assigned" />,
-      },
-      {
-        path: '/case-overview-unassigned',
-        element: <CaseOverview initialFilter="unassigned" />,
-      },
-      {
-        path: '/case-overview-other-qs',
-        element: <CaseOverview initialFilter="other-qs" />,
-      },
-      {
-        path: '/case-overview-my-cases',
-        element: <CaseOverview initialFilter="my-cases" />,
-      },
-      {
-        path: '/case-overview-high-priority',
-        element: <CaseOverview initialFilter="high-priority" />,
-      },
-      {
-        path: '/case-overview-duplicates',
-        element: <CaseOverview initialFilter="duplicates" />,
       },
       {
         path: '/access-denied',

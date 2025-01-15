@@ -11,13 +11,13 @@ const CaseOverview = ({ initialFilter }) => {
     const [selectedCases, setSelectedCases] = useState(new Set());
     const [teams, setTeams] = useState([]);
     const [filters, setFilters] = useState({
-        assigned: false,
-        unassigned: false,
-        otherQueues: false,
-        myOpenCases: false,
-        highPriority: false,
-        duplicates: false,
-        all: true, // Default to showing all cases
+        all: initialFilter === 'all',
+        assigned: initialFilter === 'assigned',
+        unassigned: initialFilter === 'unassigned',
+        otherQueues: initialFilter === 'other-qs',
+        myOpenCases: initialFilter === 'my-cases',
+        highPriority: initialFilter === 'high-priority',
+        duplicates: initialFilter === 'duplicates',
         internalFeedback: true
     });
     const [statusFilter, setStatusFilter] = useState('all');
@@ -86,25 +86,10 @@ const CaseOverview = ({ initialFilter }) => {
                 ? 'all'
                 : initialFilter;
                 
-            // Reset all filters first
-            const resetFilters = Object.fromEntries(
-                Object.keys(filters).map(key => [key, false])
-            );
-
-            // Set the active filter
-            if (filterKey === 'all') {
-                setFilters({
-                    ...resetFilters,
-                    all: true,
-                    internalFeedback: true
-                });
-            } else {
-                setFilters({
-                    ...resetFilters,
-                    [filterKey]: true,
-                    internalFeedback: true
-                });
-            }
+            setFilters(prev => ({
+                ...Object.fromEntries(Object.keys(prev).map(key => [key, false])),
+                [filterKey]: true
+            }));
             
             // Reset selected agent when view changes
             setSelectedAgent('');
@@ -422,59 +407,44 @@ const CaseOverview = ({ initialFilter }) => {
         return duplicateGroups.flat();
     };
 
-    const filterCases = (cases) => {
-        let filteredCases = [...cases];
+    const filterCases = useMemo(() => {
+        let filtered = [...cases];
 
-        // For All Cases view, combine assigned and unassigned cases
         if (filters.all) {
-            filteredCases = filteredCases.filter(caseItem => {
-                const isAssignedCase = [...tier2Members, ...supportMembers].includes(caseItem.ownerName);
-                const isUnassignedCase = caseItem.ownerName === 'Internal Queue';
-                return isAssignedCase || isUnassignedCase;
-            });
-            return filteredCases;
-        }
-
-        // For other views, apply normal filtering
-        const ownerFilterKeys = ['assigned', 'unassigned', 'otherQueues', 'myOpenCases'];
-        const activeOwnerFilters = Object.entries(filters)
-            .filter(([key, value]) => ownerFilterKeys.includes(key) && value).length;
-
-        if (activeOwnerFilters > 0) {
-            filteredCases = filteredCases.filter(caseItem => {
-                if (filters.assigned) {
-                    if ([...tier2Members, ...supportMembers].includes(caseItem.ownerName)) return true;
-                }
-                if (filters.unassigned && caseItem.ownerName === 'Internal Queue') return true;
-                if (filters.otherQueues && otherQueuesList.includes(caseItem.ownerName)) return true;
-                if (filters.myOpenCases && currentUser && caseItem.ownerName === currentUser.username) return true;
-                return false;
-            });
-        }
-
-        // Apply high priority filter
-        if (filters.highPriority) {
-            filteredCases = filteredCases.filter(caseItem => {
-                const isInternal = caseItem.feedbackType === 'Internal';
-                return isInternal && priorityList.includes(caseItem.priority);
-            });
-        }
-
-        // Apply duplicates filter
-        if (filters.duplicates) {
-            filteredCases = groupDuplicateCases(filteredCases);
+            // Show all cases without any filtering
+            filtered = [...cases];
+        } else if (filters.assigned) {
+            filtered = cases.filter(caseItem => caseItem.ownerName);
+        } else if (filters.unassigned) {
+            filtered = cases.filter(caseItem => !caseItem.ownerName);
+        } else if (filters.otherQueues) {
+            filtered = cases.filter(caseItem => 
+                otherQueuesList.some(queue => 
+                    caseItem.ownerName?.toLowerCase().includes(queue.toLowerCase())
+                )
+            );
+        } else if (filters.myOpenCases && currentUser) {
+            filtered = cases.filter(caseItem => 
+                caseItem.ownerName === currentUser.username
+            );
+        } else if (filters.highPriority) {
+            filtered = cases.filter(caseItem => 
+                priorityList.includes(caseItem.priority)
+            );
+        } else if (filters.duplicates) {
+            filtered = groupDuplicateCases(filtered);
         }
 
         // Apply agent filter
         if (selectedAgent) {
-            filteredCases = filteredCases.filter(caseItem => 
+            filtered = filtered.filter(caseItem => 
                 shouldShowCase(caseItem, cases)
             );
         }
 
         // Apply search filter
         if (searchQuery) {
-            filteredCases = filteredCases.filter(caseItem =>
+            filtered = filtered.filter(caseItem =>
                 Object.values(caseItem).some(value =>
                     String(value).toLowerCase().includes(searchQuery.toLowerCase())
                 )
@@ -484,7 +454,7 @@ const CaseOverview = ({ initialFilter }) => {
         // Apply status filter
         switch(statusFilter) {
             case 'untouched':
-                filteredCases = filteredCases.filter(caseItem =>
+                filtered = filtered.filter(caseItem =>
                     // No comments from Tier 2 or support agents AND created more than 24 hours ago
                     !caseItem.comments?.some(comment => 
                         [...tier2Members, ...supportMembers].includes(comment.by)
@@ -493,7 +463,7 @@ const CaseOverview = ({ initialFilter }) => {
                 );
                 break;
             case 'pending':
-                filteredCases = filteredCases.filter(caseItem => {
+                filtered = filtered.filter(caseItem => {
                     // Has comments from Tier 2 or support agents BUT none in the last 24 hours
                     const hasTeamComments = caseItem.comments?.some(comment =>
                         [...tier2Members, ...supportMembers].includes(comment.by)
@@ -506,7 +476,7 @@ const CaseOverview = ({ initialFilter }) => {
                 });
                 break;
             case 'new':
-                filteredCases = filteredCases.filter(caseItem =>
+                filtered = filtered.filter(caseItem =>
                     // No comments from Tier 2 or support agents AND created less than 24 hours ago
                     !caseItem.comments?.some(comment => 
                         [...tier2Members, ...supportMembers].includes(comment.by)
@@ -515,7 +485,7 @@ const CaseOverview = ({ initialFilter }) => {
                 );
                 break;
             case 'priority':
-                filteredCases = filteredCases.filter(caseItem =>
+                filtered = filtered.filter(caseItem =>
                     priorityList.includes(caseItem.priority)
                 );
                 break;
@@ -524,8 +494,8 @@ const CaseOverview = ({ initialFilter }) => {
                 break;
         }
 
-        return filteredCases;
-    };
+        return filtered;
+    }, [cases, filters, selectedAgent, searchQuery, statusFilter, tier2Members, supportMembers]);
 
     const getCaseCategory = (caseItem) => {
         if (isWithinLast24Hours(caseItem.createdDate) && !hasTier2Comments(caseItem.comments || [])) {
@@ -750,16 +720,8 @@ const CaseOverview = ({ initialFilter }) => {
             <div className="max-w-7xl mx-auto">
                 <div className="bg-white shadow-sm rounded-lg p-6">
                     <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center space-x-4">
-                            <h2 className="text-2xl font-bold text-gray-900">
-                                {filters.all ? 'All Cases' : 
-                                 filters.assigned ? 'Assigned Cases' :
-                                 filters.unassigned ? 'Unassigned Cases' :
-                                 filters.otherQueues ? 'Other Queues' :
-                                 filters.myOpenCases ? 'My Open Cases' :
-                                 filters.highPriority ? 'High Priority Cases' :
-                                 filters.duplicates ? 'Duplicate Cases' : 'Cases'}
-                            </h2>
+                        <div className="flex items-center">
+                            <h1 className="text-2xl font-semibold text-gray-900">Case Overview</h1>
                             <span className="ml-3 inline-flex items-center justify-center h-6 px-3 text-sm font-medium rounded-full bg-blue-100 text-blue-800 translate-y-[1px]">
                                 {filteredCases.length} {filteredCases.length === 1 ? 'case' : 'cases'}
                             </span>

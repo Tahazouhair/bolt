@@ -21,18 +21,18 @@ const Sidebar = ({ activeTab, setActiveTab, userRole }) => {
       icon: ClockIcon, 
       tab: 'case-overview',
       subItems: [
-        { 
-          name: 'All Cases', 
+        {
+          name: 'All Cases',
           tab: 'case-overview-all',
           requireRole: ['admin', 'moderator']
         },
         { 
-          name: 'Assigned Cases', 
+          name: 'Assigned', 
           tab: 'case-overview-assigned',
           requireRole: ['admin', 'moderator']
         },
         { 
-          name: 'Unassigned Cases', 
+          name: 'Unassigned', 
           tab: 'case-overview-unassigned',
           requireRole: ['admin', 'moderator']
         },
@@ -164,55 +164,17 @@ const Sidebar = ({ activeTab, setActiveTab, userRole }) => {
                           (subItem.requireRole && subItem.requireRole.includes(userRole.toLowerCase()))
                         )
                         .map((subItem) => (
-                          <div key={subItem.tab}>
-                            <button
-                              onClick={() => {
-                                if (subItem.subItems) {
-                                  toggleExpand(subItem.tab);
-                                } else {
-                                  setActiveTab(subItem.tab);
-                                }
-                              }}
-                              className={`${
-                                (activeTab === subItem.tab && !subItem.subItems) || (subItem.subItems && subItem.subItems.some(sub => activeTab === sub.tab))
-                                  ? 'bg-gray-800 text-white'
-                                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                              } group flex w-full items-center rounded-md py-2 pl-2 text-sm font-medium`}
-                            >
-                              <div className="flex items-center">
-                                {subItem.name}
-                              </div>
-                              {subItem.subItems && (
-                                isExpanded && subItem.subItems.some(sub => activeTab === sub.tab) ? (
-                                  <ChevronDownIcon className="h-5 w-5 text-gray-400" />
-                                ) : (
-                                  <ChevronRightIcon className="h-5 w-5 text-gray-400" />
-                                )
-                              )}
-                            </button>
-                            {subItem.subItems && isExpanded && subItem.subItems.some(sub => activeTab === sub.tab) && (
-                              <div className="ml-8 mt-1 space-y-1">
-                                {subItem.subItems
-                                  .filter(sub => 
-                                    !sub.requireRole || 
-                                    (sub.requireRole && sub.requireRole.includes(userRole.toLowerCase()))
-                                  )
-                                  .map((sub) => (
-                                    <button
-                                      key={sub.tab}
-                                      onClick={() => setActiveTab(sub.tab)}
-                                      className={`${
-                                        activeTab === sub.tab
-                                          ? 'bg-gray-800 text-white'
-                                          : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                                      } group flex w-full items-center rounded-md py-2 pl-2 text-sm font-medium`}
-                                    >
-                                      {sub.name}
-                                    </button>
-                                  ))}
-                              </div>
-                            )}
-                          </div>
+                          <button
+                            key={subItem.tab}
+                            onClick={() => setActiveTab(subItem.tab)}
+                            className={`${
+                              activeTab === subItem.tab
+                                ? 'bg-gray-800 text-white'
+                                : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                            } group flex w-full items-center rounded-md py-2 pl-2 text-sm font-medium`}
+                          >
+                            {subItem.name}
+                          </button>
                         ))}
                     </div>
                   )}

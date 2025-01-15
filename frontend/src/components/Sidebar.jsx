@@ -21,22 +21,20 @@ const Sidebar = ({ activeTab, setActiveTab, userRole }) => {
       icon: ClockIcon, 
       tab: 'case-overview',
       subItems: [
-        {
-          name: 'Cases Assignment',
-          tab: 'case-overview-assignment',
-          requireRole: ['admin', 'moderator'],
-          subItems: [
-            {
-              name: 'Assigned',
-              tab: 'case-overview-assigned',
-              requireRole: ['admin', 'moderator']
-            },
-            {
-              name: 'Unassigned',
-              tab: 'case-overview-unassigned',
-              requireRole: ['admin', 'moderator']
-            }
-          ]
+        { 
+          name: 'All Cases', 
+          tab: 'case-overview-all',
+          requireRole: ['admin', 'moderator']
+        },
+        { 
+          name: 'Assigned Cases', 
+          tab: 'case-overview-assigned',
+          requireRole: ['admin', 'moderator']
+        },
+        { 
+          name: 'Unassigned Cases', 
+          tab: 'case-overview-unassigned',
+          requireRole: ['admin', 'moderator']
         },
         { 
           name: 'Other Qs', 

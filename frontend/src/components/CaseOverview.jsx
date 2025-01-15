@@ -17,7 +17,7 @@ const CaseOverview = ({ initialFilter }) => {
         myOpenCases: initialFilter === 'my-cases',
         highPriority: initialFilter === 'high-priority',
         duplicates: initialFilter === 'duplicates',
-        assignment: initialFilter === 'assignment',
+        all: initialFilter === 'all',
         internalFeedback: true
     });
     const [statusFilter, setStatusFilter] = useState('all');
@@ -82,15 +82,15 @@ const CaseOverview = ({ initialFilter }) => {
                 ? 'highPriority'
                 : initialFilter === 'duplicates'
                 ? 'duplicates'
-                : initialFilter === 'assignment'
-                ? 'assignment'
+                : initialFilter === 'all'
+                ? 'all'
                 : initialFilter;
                 
             setFilters(prev => ({
                 ...Object.fromEntries(Object.keys(prev).map(key => [key, false])),
                 [filterKey]: true,
-                // If assignment view, show both assigned and unassigned
-                ...(filterKey === 'assignment' ? { assigned: true, unassigned: true } : {})
+                // If all cases view, show both assigned and unassigned
+                ...(filterKey === 'all' ? { assigned: true, unassigned: true } : {})
             }));
             
             // Reset selected agent when view changes

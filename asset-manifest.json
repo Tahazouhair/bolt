@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/bolt/static/css/main.72d637bb.css",
-    "main.js": "/bolt/static/js/main.dbc5f629.js",
+    "main.js": "/bolt/static/js/main.6f3813af.js",
     "index.html": "/bolt/index.html",
     "main.72d637bb.css.map": "/bolt/static/css/main.72d637bb.css.map",
-    "main.dbc5f629.js.map": "/bolt/static/js/main.dbc5f629.js.map"
+    "main.6f3813af.js.map": "/bolt/static/js/main.6f3813af.js.map"
   },
   "entrypoints": [
     "static/css/main.72d637bb.css",
-    "static/js/main.dbc5f629.js"
+    "static/js/main.6f3813af.js"
   ]
 }

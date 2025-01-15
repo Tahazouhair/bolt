@@ -17,7 +17,7 @@ const CaseOverview = ({ initialFilter }) => {
         myOpenCases: initialFilter === 'my-cases',
         highPriority: initialFilter === 'high-priority',
         duplicates: initialFilter === 'duplicates',
-        all: initialFilter === 'all',
+        all: initialFilter === 'all' || !initialFilter, // Set all to true if no filter is provided
         internalFeedback: true
     });
     const [statusFilter, setStatusFilter] = useState('all');
@@ -430,7 +430,8 @@ const CaseOverview = ({ initialFilter }) => {
         const activeOwnerFilters = Object.entries(filters)
             .filter(([key, value]) => ownerFilterKeys.includes(key) && value).length;
 
-        if (activeOwnerFilters > 0) {
+        // Skip owner filtering if "all" filter is active or no owner filters are active
+        if (!filters.all && activeOwnerFilters > 0) {
             filteredCases = filteredCases.filter(caseItem => {
                 if (filters.assigned) {
                     if ([...tier2Members, ...supportMembers].includes(caseItem.ownerName)) return true;
@@ -740,8 +741,16 @@ const CaseOverview = ({ initialFilter }) => {
             <div className="max-w-7xl mx-auto">
                 <div className="bg-white shadow-sm rounded-lg p-6">
                     <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center">
-                            <h1 className="text-2xl font-semibold text-gray-900">Case Overview</h1>
+                        <div className="flex items-center space-x-4">
+                            <h2 className="text-2xl font-bold text-gray-900">
+                                {filters.all ? 'All Cases' : 
+                                 filters.assigned ? 'Assigned Cases' :
+                                 filters.unassigned ? 'Unassigned Cases' :
+                                 filters.otherQueues ? 'Other Queues' :
+                                 filters.myOpenCases ? 'My Open Cases' :
+                                 filters.highPriority ? 'High Priority Cases' :
+                                 filters.duplicates ? 'Duplicate Cases' : 'Cases'}
+                            </h2>
                             <span className="ml-3 inline-flex items-center justify-center h-6 px-3 text-sm font-medium rounded-full bg-blue-100 text-blue-800 translate-y-[1px]">
                                 {filteredCases.length} {filteredCases.length === 1 ? 'case' : 'cases'}
                             </span>

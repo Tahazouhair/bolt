@@ -1,5 +1,5 @@
-import { createHashRouter } from 'react-router-dom';
-import App from './App';
+import { createHashRouter, Navigate } from 'react-router-dom';
+import App, { PrivateRoute } from './App';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Champs from './components/Champs';
@@ -10,11 +10,10 @@ const router = createHashRouter([
   {
     path: "/",
     element: <App />,
-    errorElement: <AccessDenied />,
     children: [
       {
         path: '/',
-        element: <Login />,
+        element: <Navigate to="/login" replace />
       },
       {
         path: '/login',
@@ -22,87 +21,24 @@ const router = createHashRouter([
       },
       {
         path: '/dashboard',
-        element: <Dashboard />,
+        element: <PrivateRoute><Dashboard /></PrivateRoute>,
       },
       {
         path: '/champs',
-        element: <Champs />,
+        element: <PrivateRoute><Champs /></PrivateRoute>,
       },
-      // Case Overview Routes
       {
         path: '/case-overview',
-        element: <CaseOverview />,
-      },
-      {
-        path: '/case-overview/all',
-        element: <CaseOverview initialFilter="all" />,
-      },
-      {
-        path: '/case-overview/assigned',
-        element: <CaseOverview initialFilter="assigned" />,
-      },
-      {
-        path: '/case-overview/unassigned',
-        element: <CaseOverview initialFilter="unassigned" />,
-      },
-      {
-        path: '/case-overview/other-qs',
-        element: <CaseOverview initialFilter="other-qs" />,
-      },
-      {
-        path: '/case-overview/my-cases',
-        element: <CaseOverview initialFilter="my-cases" />,
-      },
-      {
-        path: '/case-overview/high-priority',
-        element: <CaseOverview initialFilter="high-priority" />,
-      },
-      {
-        path: '/case-overview/duplicates',
-        element: <CaseOverview initialFilter="duplicates" />,
-      },
-      // QC Failure Routes
-      {
-        path: '/qc-failure/order-cleaner',
-        element: <AccessDenied />, // Placeholder until components are created
-      },
-      {
-        path: '/qc-failure/case-cleaner',
-        element: <AccessDenied />,
-      },
-      {
-        path: '/qc-failure/salesforce-query',
-        element: <AccessDenied />,
-      },
-      {
-        path: '/qc-failure/combined-id',
-        element: <AccessDenied />,
-      },
-      {
-        path: '/qc-failure/cases',
-        element: <AccessDenied />,
-      },
-      // Other Routes
-      {
-        path: '/activities',
-        element: <AccessDenied />,
-      },
-      {
-        path: '/analytics',
-        element: <AccessDenied />,
-      },
-      {
-        path: '/users',
-        element: <AccessDenied />,
-      },
-      {
-        path: '/settings',
-        element: <AccessDenied />,
+        element: <PrivateRoute><CaseOverview /></PrivateRoute>,
       },
       {
         path: '/access-denied',
         element: <AccessDenied />,
       },
+      {
+        path: '*',
+        element: <Navigate to="/login" replace />
+      }
     ],
   },
 ], {

@@ -1,5 +1,5 @@
-import { createHashRouter, Navigate } from 'react-router-dom';
-import App, { PrivateRoute } from './App';
+import { createHashRouter } from 'react-router-dom';
+import App from './App';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Champs from './components/Champs';
@@ -13,7 +13,7 @@ const router = createHashRouter([
     children: [
       {
         path: '/',
-        element: <Navigate to="/login" replace />
+        element: <Login />,
       },
       {
         path: '/login',
@@ -21,24 +21,20 @@ const router = createHashRouter([
       },
       {
         path: '/dashboard',
-        element: <PrivateRoute><Dashboard /></PrivateRoute>,
+        element: <Dashboard />,
       },
       {
         path: '/champs',
-        element: <PrivateRoute><Champs /></PrivateRoute>,
+        element: <Champs />,
       },
       {
         path: '/case-overview',
-        element: <PrivateRoute><CaseOverview /></PrivateRoute>,
+        element: <CaseOverview />,
       },
       {
         path: '/access-denied',
         element: <AccessDenied />,
       },
-      {
-        path: '*',
-        element: <Navigate to="/login" replace />
-      }
     ],
   },
 ], {

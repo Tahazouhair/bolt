@@ -86,12 +86,25 @@ const CaseOverview = ({ initialFilter }) => {
                 ? 'all'
                 : initialFilter;
                 
-            setFilters(prev => ({
-                ...Object.fromEntries(Object.keys(prev).map(key => [key, false])),
-                [filterKey]: true,
-                // If all cases view, show both assigned and unassigned
-                ...(filterKey === 'all' ? { assigned: true, unassigned: true } : {})
-            }));
+            // Reset all filters first
+            const resetFilters = Object.fromEntries(
+                Object.keys(filters).map(key => [key, false])
+            );
+
+            // Set the active filter
+            if (filterKey === 'all') {
+                setFilters({
+                    ...resetFilters,
+                    all: true,
+                    internalFeedback: true
+                });
+            } else {
+                setFilters({
+                    ...resetFilters,
+                    [filterKey]: true,
+                    internalFeedback: true
+                });
+            }
             
             // Reset selected agent when view changes
             setSelectedAgent('');

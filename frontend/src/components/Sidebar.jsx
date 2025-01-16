@@ -54,7 +54,6 @@ const Sidebar = ({ activeTab, setActiveTab, userRole }) => {
       name: 'QC Failure',
       icon: ClockIcon,
       tab: 'qc-failure',
-      hidden: true,
       subItems: [
         {
           name: 'Order Number Cleaner',

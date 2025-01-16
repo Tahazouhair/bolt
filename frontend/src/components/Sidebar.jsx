@@ -54,26 +54,32 @@ const Sidebar = ({ activeTab, setActiveTab, userRole }) => {
       name: 'QC Failure',
       icon: ClockIcon,
       tab: 'qc-failure',
+      requireRole: ['admin', 'moderator'],
       subItems: [
         {
           name: 'Order Number Cleaner',
-          tab: 'qc-failure-order-cleaner'
+          tab: 'qc-failure-order-cleaner',
+          requireRole: ['admin', 'moderator']
         },
         {
           name: 'Case Number Cleaner',
-          tab: 'qc-failure-case-cleaner'
+          tab: 'qc-failure-case-cleaner',
+          requireRole: ['admin', 'moderator']
         },
         {
           name: 'Salesforce Query',
-          tab: 'qc-failure-salesforce-query'
+          tab: 'qc-failure-salesforce-query',
+          requireRole: ['admin', 'moderator']
         },
         {
           name: 'Combined ID',
-          tab: 'qc-failure-combined-id'
+          tab: 'qc-failure-combined-id',
+          requireRole: ['admin', 'moderator']
         },
         {
           name: 'QC Failure Cases',
-          tab: 'qc-failure-cases'
+          tab: 'qc-failure-cases',
+          requireRole: ['admin', 'moderator']
         }
       ]
     },

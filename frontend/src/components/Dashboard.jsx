@@ -13,6 +13,7 @@ import OrderCleaner from './OrderCleaner';
 import CaseCleaner from './CaseCleaner';
 import CombinedIdCleaner from './CombinedIdCleaner';
 import QCFailure from './QCFailure';
+import Users from './Users';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -237,15 +238,9 @@ const Dashboard = () => {
           </div>
         );
       case 'qc-failure-cases':
-        // Temporarily hide QC Failure section
         return (
           <div className="bg-white shadow sm:rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium leading-6 text-gray-900">QC Failure</h3>
-              <div className="mt-2 max-w-xl text-sm text-gray-500">
-                <p>This section is temporarily unavailable.</p>
-              </div>
-            </div>
+            <QCFailure />
           </div>
         );
       case 'settings':

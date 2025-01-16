@@ -13,7 +13,6 @@ import OrderCleaner from './OrderCleaner';
 import CaseCleaner from './CaseCleaner';
 import CombinedIdCleaner from './CombinedIdCleaner';
 import QCFailure from './QCFailure';
-import Users from './Users';
 
 const API_URL = process.env.REACT_APP_API_URL;
 

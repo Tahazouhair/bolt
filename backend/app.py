@@ -31,31 +31,25 @@ print("Loading configuration...")
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
 
 # Database Configuration
-if os.environ.get('DATABASE_URL'):
-    # Production PostgreSQL database
-    database_url = os.environ.get('DATABASE_URL')
+database_url = os.environ.get('DATABASE_URL')
+if database_url:
+    # Clean and print the database URL (without sensitive info)
+    print("Database URL found in environment")
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    masked_url = database_url.split('@')[0] + '@' + '****'
+    print(f"Using database URL: {masked_url}")
     
-    # Add SSL mode and other required parameters
-    if '?' not in database_url:
-        database_url += '?sslmode=require'
-    
-    print(f"Using PostgreSQL database URL (masked): {database_url.split('@')[0]}@****")
+    # Configure SQLAlchemy
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'pool_pre_ping': True,
         'pool_recycle': 300,
-        'connect_args': {
-            'sslmode': 'require',
-            'connect_timeout': 10
-        }
     }
 else:
-    # Development SQLite database
+    print("No DATABASE_URL found, using SQLite")
     sqlite_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard.db')
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{sqlite_path}'
-    print(f"Using SQLite database: {sqlite_path}")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 

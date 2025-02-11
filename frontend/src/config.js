@@ -1,5 +1,7 @@
 // API Configuration
-export const API_URL = 'http://localhost:5000';
+export const API_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://bolt-backend-xu7f.onrender.com'
+  : 'http://localhost:5000';
 
 // Google Sheets Configuration
 export const GOOGLE_SHEETS_CONFIG = {

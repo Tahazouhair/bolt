@@ -766,6 +766,11 @@ def scrape_brand():
         if 'conn' in locals():
             conn.close()
 
+# Health check endpoint
+@app.route('/api/health')
+def health_check():
+    return jsonify({"status": "healthy", "message": "Backend is running"}), 200
+
 # Create the database tables
 with app.app_context():
     try:

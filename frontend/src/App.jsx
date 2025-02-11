@@ -9,7 +9,8 @@ const App = () => {
 
   // Redirect to login if not authenticated
   React.useEffect(() => {
-    if (!isAuthenticated && window.location.pathname !== '/login') {
+    const path = window.location.hash.replace('#', '') || '/';
+    if (!isAuthenticated && path !== '/login') {
       navigate('/login');
     }
   }, [isAuthenticated, navigate]);

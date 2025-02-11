@@ -49,24 +49,30 @@ login_manager.init_app(app)
 
 def init_db():
     print("Running database initialization...")
-    max_retries = 3
-    retry_count = 0
-    
-    while retry_count < max_retries:
-        try:
-            with app.app_context():
-                db.create_all()
-                print("Database tables created successfully")
-                return True
-        except Exception as e:
-            retry_count += 1
-            print(f"Error creating database tables (attempt {retry_count}/{max_retries}): {str(e)}")
-            if retry_count < max_retries:
-                print("Retrying in 5 seconds...")
-                time.sleep(5)
-            else:
-                print("Max retries reached. Database initialization failed.")
-                return False
+    try:
+        print("Creating all database tables...")
+        db.create_all()
+        print("Database tables created successfully")
+        
+        # Check if admin exists
+        admin = User.query.filter_by(username='admin').first()
+        if not admin:
+            print("Creating default admin user...")
+            hashed_password = generate_password_hash('admin')
+            default_admin = User(
+                username='admin',
+                password=hashed_password,
+                role='admin'
+            )
+            db.session.add(default_admin)
+            db.session.commit()
+            print("Default admin user created successfully")
+        else:
+            print("Admin user already exists")
+            
+    except Exception as e:
+        print(f"Error during database initialization: {str(e)}")
+        raise e
 
 def init_scrape_cache():
     conn = sqlite3.connect('scrape_cache.db')
@@ -77,8 +83,15 @@ def init_scrape_cache():
     conn.close()
 
 # Initialize the database
-init_db()
-init_scrape_cache()
+with app.app_context():
+    try:
+        print("Starting application initialization...")
+        init_db()
+        init_scrape_cache()
+        print("Application initialization completed successfully")
+    except Exception as e:
+        print(f"Error during application initialization: {str(e)}")
+        raise e
 
 # Models
 class User(UserMixin, db.Model):
@@ -252,34 +265,45 @@ def get_activities(current_user):
 @app.route('/api/setup-admin', methods=['POST'])
 def setup_admin():
     try:
-        if User.query.filter_by(role='admin').first():
+        print("Starting admin setup...")
+        # Check if admin already exists
+        admin = User.query.filter_by(username='admin').first()
+        if admin:
+            print("Admin already exists")
             return jsonify({'message': 'Admin already exists'}), 400
-            
-        data = request.get_json()
-        if not data or 'username' not in data or 'password' not in data:
-            return jsonify({'message': 'Missing username or password'}), 400
-            
-        print(f"Creating admin user with username: {data['username']}")  # Debug log
+
+        print("Creating admin user...")
+        # Create admin user
+        hashed_password = generate_password_hash('admin')
+        new_admin = User(
+            username='admin',
+            password=hashed_password,
+            role='admin'
+        )
         
-        hashed_password = generate_password_hash(data['password'], method='sha256')
-        admin = User(username=data['username'], password=hashed_password, role='admin')
-        
-        db.session.add(admin)
+        print("Adding admin to database...")
+        db.session.add(new_admin)
         db.session.commit()
+        print("Admin created successfully")
         
-        print("Admin user created successfully")  # Debug log
+        # Create and return JWT token
+        token = jwt.encode({
+            'user_id': new_admin.id,
+            'exp': datetime.utcnow() + timedelta(days=1)
+        }, app.config['SECRET_KEY'])
         
         return jsonify({
-            'message': 'Admin user created successfully',
+            'message': 'Admin account created successfully',
+            'token': token,
             'user': {
-                'username': admin.username,
-                'role': admin.role
+                'username': new_admin.username,
+                'role': new_admin.role
             }
         })
     except Exception as e:
-        print(f"Error creating admin: {str(e)}")  # Debug log
+        print(f"Error during admin setup: {str(e)}")
         db.session.rollback()
-        return jsonify({'message': f'Error creating admin: {str(e)}'}), 500
+        return jsonify({'message': f'Error creating admin account: {str(e)}'}), 500
 
 @app.route('/api/users', methods=['GET'])
 @token_required
@@ -770,20 +794,6 @@ def scrape_brand():
 @app.route('/api/health')
 def health_check():
     return jsonify({"status": "healthy", "message": "Backend is running"}), 200
-
-# Create the database tables
-with app.app_context():
-    try:
-        print("Checking database...")
-        if not os.path.exists('dashboard.db'):
-            print("Database not found, initializing...")
-            db.create_all()
-            setup_admin()
-            print("Database initialized successfully!")
-        else:
-            print("Using existing database...")
-    except Exception as e:
-        print(f"Error initializing database: {e}")
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

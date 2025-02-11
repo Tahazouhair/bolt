@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/bolt/static/css/main.7a309336.css",
-    "main.js": "/bolt/static/js/main.7f2dcfba.js",
-    "index.html": "/bolt/index.html",
-    "main.7a309336.css.map": "/bolt/static/css/main.7a309336.css.map",
-    "main.7f2dcfba.js.map": "/bolt/static/js/main.7f2dcfba.js.map"
+    "main.css": "/static/css/main.0e1e51c8.css",
+    "main.js": "/static/js/main.138a49cb.js",
+    "index.html": "/index.html",
+    "main.0e1e51c8.css.map": "/static/css/main.0e1e51c8.css.map",
+    "main.138a49cb.js.map": "/static/js/main.138a49cb.js.map"
   },
   "entrypoints": [
-    "static/css/main.7a309336.css",
-    "static/js/main.7f2dcfba.js"
+    "static/css/main.0e1e51c8.css",
+    "static/js/main.138a49cb.js"
   ]
 }

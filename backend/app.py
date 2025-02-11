@@ -29,17 +29,26 @@ CORS(app,
 # Configuration
 print("Loading configuration...")
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///dashboard.db')
-if database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
 
-# Add SSL mode to PostgreSQL URL if not already present
-if 'postgresql://' in database_url and '?' not in database_url:
-    database_url += '?sslmode=require'
+# Database Configuration
+if os.environ.get('DATABASE_URL'):
+    # Production PostgreSQL database
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    print(f"Using PostgreSQL database: {database_url}")
+else:
+    # Development SQLite database
+    sqlite_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{sqlite_path}'
+    print(f"Using SQLite database: {sqlite_path}")
 
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-print(f"Database URL: {database_url}")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
 
 # Initialize extensions
 print("Initializing database...")
@@ -49,30 +58,47 @@ login_manager.init_app(app)
 
 def init_db():
     print("Running database initialization...")
-    try:
-        print("Creating all database tables...")
-        db.create_all()
-        print("Database tables created successfully")
-        
-        # Check if admin exists
-        admin = User.query.filter_by(username='admin').first()
-        if not admin:
-            print("Creating default admin user...")
-            hashed_password = generate_password_hash('admin')
-            default_admin = User(
-                username='admin',
-                password=hashed_password,
-                role='admin'
-            )
-            db.session.add(default_admin)
-            db.session.commit()
-            print("Default admin user created successfully")
-        else:
-            print("Admin user already exists")
+    max_retries = 3
+    retry_delay = 5  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            print(f"Attempt {attempt + 1}/{max_retries} to initialize database...")
             
-    except Exception as e:
-        print(f"Error during database initialization: {str(e)}")
-        raise e
+            # Test database connection
+            db.engine.connect()
+            print("Database connection successful")
+            
+            # Create tables
+            db.create_all()
+            print("Database tables created successfully")
+            
+            # Check if admin exists
+            admin = User.query.filter_by(username='admin').first()
+            if not admin:
+                print("Creating default admin user...")
+                hashed_password = generate_password_hash('admin')
+                default_admin = User(
+                    username='admin',
+                    password=hashed_password,
+                    role='admin'
+                )
+                db.session.add(default_admin)
+                db.session.commit()
+                print("Default admin user created successfully")
+            else:
+                print("Admin user already exists")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error during database initialization (attempt {attempt + 1}): {str(e)}")
+            if attempt < max_retries - 1:
+                print(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+            else:
+                print("Max retries reached. Database initialization failed.")
+                raise e
 
 def init_scrape_cache():
     conn = sqlite3.connect('scrape_cache.db')

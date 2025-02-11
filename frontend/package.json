@@ -2,11 +2,11 @@
   "name": "bolt-dashboard",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://tahazouhair.github.io/bolt",
   "dependencies": {
     "@headlessui/react": "^1.7.19",
     "@heroicons/react": "^2.2.0",
     "@material-tailwind/react": "^2.1.10",
+    "@phosphor-icons/react": "^2.1.7",
     "axios": "^1.5.0",
     "classnames": "^2.5.1",
     "date-fns": "^4.1.0",

@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard';
 import Champs from './components/Champs';
 import CaseOverview from './components/CaseOverview';
 import AccessDenied from './components/AccessDenied';
+import EligibilityChecker from './components/EligibilityChecker';
 
 const router = createHashRouter([
   {
@@ -34,6 +35,10 @@ const router = createHashRouter([
       {
         path: '/access-denied',
         element: <AccessDenied />,
+      },
+      {
+        path: '/qc-failure-salesforce-query',
+        element: <EligibilityChecker />,
       },
     ],
   },

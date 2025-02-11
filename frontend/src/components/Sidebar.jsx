@@ -67,7 +67,7 @@ const Sidebar = ({ activeTab, setActiveTab, userRole }) => {
           requireRole: ['admin', 'moderator']
         },
         {
-          name: 'Salesforce Query',
+          name: 'Eligibility Checker',
           tab: 'qc-failure-salesforce-query',
           requireRole: ['admin', 'moderator']
         },

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MagnifyingGlassIcon, ArrowDownTrayIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, FunnelIcon, ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import * as XLSX from 'xlsx';
+import { GOOGLE_SHEETS_CONFIG } from '../config';
 
 const QCFailure = () => {
   const [cases, setCases] = useState([]);
@@ -29,11 +30,7 @@ const QCFailure = () => {
   const [currentUndecidedIndex, setCurrentUndecidedIndex] = useState(0);
   const caseRefs = useRef({});
 
-  // Get configuration from environment variables
-  const sheetId = process.env.REACT_APP_QC_SHEET_ID;
-  const range = process.env.REACT_APP_SHEET_RANGE;
-  const brandsRange = process.env.REACT_APP_BRANDS_RANGE;
-  const apiKey = process.env.REACT_APP_API_KEY;
+  const { QC_SHEET_ID, SHEET_RANGE, BRANDS_RANGE, API_KEY } = GOOGLE_SHEETS_CONFIG;
 
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
   const MAX_RETRIES = 3;
@@ -75,7 +72,27 @@ const QCFailure = () => {
 
   const getProductUrl = (sku) => `https://ounass.ae/${sku}.html`;
 
-  const scrapeBrandName = async (url) => {
+  const clearDecisions = () => {
+    if (window.confirm('Are you sure you want to clear all decisions?')) {
+      setDecisions({});
+      localStorage.removeItem('qcDecisions');
+      console.log('Cleared all decisions');
+    }
+  };
+
+  const clearScrapingCache = () => {
+    localStorage.removeItem('scrapingFailures');
+    localStorage.removeItem('brandNames');
+    localStorage.removeItem('productPrices');
+    setBrandNames({});
+    setProductPrices({});
+    console.log('Cleared scraping cache');
+  };
+
+  const scrapeBrandName = async (url, retryCount = 0) => {
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 second
+
     try {
       const response = await fetch('http://localhost:5000/api/scrape-brand', {
         method: 'POST',
@@ -86,32 +103,58 @@ const QCFailure = () => {
         credentials: 'include',
       });
       
-      const data = await response.json();
-      if (data.brand || data.price) {
-        return {
-          brand: data.brand,
-          price: data.price
-        };
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      return {
+        brand: data.brand,
+        price: data.price,
+        cached: data.cached
+      };
     } catch (error) {
-      console.error('Error scraping brand:', error);
+      console.error(`Error scraping brand (attempt ${retryCount + 1}/${maxRetries}):`, error);
+      
+      if (retryCount < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, retryCount)));
+        return scrapeBrandName(url, retryCount + 1);
+      }
+
+      // On final failure, don't cache the failure anymore
+      return { brand: null, price: null, error: error.message };
     }
-    return { brand: null, price: null };
   };
 
   const fetchBrandNames = async (products) => {
     const uniqueProducts = [...new Set(products)];
-    const batchSize = 5; // Process 5 products at a time
+    const batchSize = 3; // Reduced batch size to 3
+    const failureCache = {};
+    const failureCacheTimeout = 5 * 60 * 1000; // Reduced to 5 minutes
     
     for (let i = 0; i < uniqueProducts.length; i += batchSize) {
       const batch = uniqueProducts.slice(i, i + batchSize);
       const promises = batch.map(async (sku) => {
         const url = getProductUrl(sku);
+        
         // Check if we already have the data in state
         if (brandNames[url] && productPrices[url]) {
           return;
         }
-        const { brand, price } = await scrapeBrandName(url);
+
+        // Check if we have a recent failure for this URL
+        const failureData = failureCache[url];
+        if (failureData && Date.now() - failureData.timestamp < failureCacheTimeout) {
+          console.log(`Skipping recently failed URL: ${url}`);
+          return;
+        }
+
+        const { brand, price, error } = await scrapeBrandName(url);
+        
         if (brand || price) {
           if (brand) {
             setBrandNames(prev => {
@@ -133,12 +176,20 @@ const QCFailure = () => {
               return updated;
             });
           }
+        } else if (error) {
+          console.warn(`Failed to scrape data for ${url}: ${error}`);
+          // Store failure in memory but not in localStorage
+          failureCache[url] = {
+            timestamp: Date.now(),
+            error: error
+          };
         }
       });
+
       await Promise.all(promises);
-      // Small delay between batches to prevent rate limiting
+      // Increased delay between batches to 2 seconds
       if (i + batchSize < uniqueProducts.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
   };
@@ -158,7 +209,7 @@ const QCFailure = () => {
         }
       }
 
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${brandsRange}?key=${apiKey}`;
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${QC_SHEET_ID}/values/${BRANDS_RANGE}?key=${API_KEY}`;
       const data = await fetchWithRetry(url);
 
       if (data.values) {
@@ -200,7 +251,7 @@ const QCFailure = () => {
         }
       }
 
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${QC_SHEET_ID}/values/${SHEET_RANGE}?key=${API_KEY}`;
       const data = await fetchWithRetry(url);
 
       if (!data.values) {
@@ -540,6 +591,8 @@ const QCFailure = () => {
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true);
+      // Only clear scraping failures, not brand names and prices
+      localStorage.removeItem('scrapingFailures');
       await Promise.all([
         fetchLuxuryBrands(),
         fetchData()
@@ -552,17 +605,17 @@ const QCFailure = () => {
     // Add event listener for beforeunload
     const handleBeforeUnload = (e) => {
       const hasUndecidedCases = cases.some(caseItem => !decisions[caseItem.id]);
-      
       if (hasUndecidedCases) {
         e.preventDefault();
-        e.returnValue = 'You have undecided cases. Are you sure you want to leave?';
-        return e.returnValue;
+        e.returnValue = '';
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []); // Empty dependency array for initial load only
+  }, []);
+
+  const decisionOptions = ['Approved', 'Rejected', 'Incorrectly Assigned', 'Review Needed'];
 
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
@@ -620,6 +673,12 @@ const QCFailure = () => {
               >
                 <ArrowDownTrayIcon className="h-4 w-4 mr-1.5 text-gray-500" />
                 Export XLSX {selectedCases.size > 0 ? `(${selectedCases.size})` : ''}
+              </button>
+              <button
+                onClick={clearDecisions}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors duration-200"
+              >
+                Clear All
               </button>
               <button
                 onClick={showDecisions ? handleBackToCases : handleSubmitDecisions}
@@ -685,6 +744,7 @@ const QCFailure = () => {
                     ${decisions[caseData.id]?.status === 'Approved' ? 'bg-green-100 text-green-800' :
                       decisions[caseData.id]?.status === 'Rejected' ? 'bg-red-100 text-red-800' :
                       decisions[caseData.id]?.status === 'Incorrectly Assigned' ? 'bg-yellow-100 text-yellow-800' :
+                      decisions[caseData.id]?.status === 'Review Needed' ? 'bg-blue-100 text-blue-800' :
                       'bg-gray-100 text-gray-800'}`}>
                     <span className="flex items-center">
                       {getDecisionIcon(decisions[caseData.id]?.status)}
@@ -829,7 +889,7 @@ const QCFailure = () => {
                   <div className="col-span-2 pl-4 border-l">
                     <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Action</div>
                     <div className="space-y-1">
-                      {['Approved', 'Rejected', 'Incorrectly Assigned'].map((option) => (
+                      {decisionOptions.map((option) => (
                         <label
                           key={option}
                           className={`flex items-center p-1.5 rounded cursor-pointer

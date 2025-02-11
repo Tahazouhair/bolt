@@ -72,7 +72,7 @@ def init_scrape_cache():
     conn = sqlite3.connect('scrape_cache.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS scrape_cache
-                 (url TEXT PRIMARY KEY, brand TEXT, price TEXT, timestamp DATETIME)''')
+                 (url TEXT PRIMARY KEY, brand TEXT, price TEXT, timestamp TEXT)''')
     conn.commit()
     conn.close()
 
@@ -155,6 +155,26 @@ def clean_brand_name(brand_name):
             brand = brand[:-(len(suffix))].strip()
     
     return brand.strip()
+
+def normalize_price(price_str):
+    if not price_str:
+        return None
+    # Remove currency symbols and non-numeric characters except dots and commas
+    price_str = ''.join(c for c in price_str if c.isdigit() or c in '.,')
+    # Convert to consistent format
+    try:
+        # Handle different decimal separators
+        if ',' in price_str and '.' in price_str:
+            if price_str.find(',') > price_str.find('.'):
+                price_str = price_str.replace('.', '')  # European format
+                price_str = price_str.replace(',', '.')
+            else:
+                price_str = price_str.replace(',', '')  # US format
+        elif ',' in price_str:
+            price_str = price_str.replace(',', '.')
+        return "{:.2f}".format(float(price_str))
+    except ValueError:
+        return None
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -546,79 +566,202 @@ def scrape_brand():
         if not url:
             return jsonify({'error': 'URL is required'}), 400
 
-        # Check cache first
-        conn = sqlite3.connect('scrape_cache.db')
-        c = conn.cursor()
-        c.execute('SELECT brand, price, timestamp FROM scrape_cache WHERE url = ?', (url,))
-        cache_result = c.fetchone()
-        
-        # If we have a cached result less than 24 hours old, return it
-        if cache_result:
-            brand, price, timestamp = cache_result
-            cache_time = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S.%f')
-            if datetime.now() - cache_time < timedelta(hours=24):
-                print(f"Cache hit for {url}")
-                return jsonify({
-                    'brand': brand,
-                    'price': price,
-                    'cached': True
-                })
-
-        # Make the request to the URL with a timeout
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(url, headers=headers, timeout=5)
-        response.raise_for_status()
-        
-        # Parse the HTML using lxml for faster parsing
-        soup = BeautifulSoup(response.text, 'lxml')
-        
-        # Try multiple methods to find the brand name
-        brand_name = None
-        selectors = [
-            ('a[href^="/women/designers/"]', lambda x: x.text.strip()),
-            ('a[href^="/men/designers/"]', lambda x: x.text.strip()),
-            ('nav.breadcrumb a:last-child, nav.breadcrumbs a:last-child', lambda x: x.text.strip()),
-            ('h1', lambda x: x.text.strip().split(' - ')[0].split(' | ')[0].strip())
-        ]
-        
-        for selector, extractor in selectors:
-            elements = soup.select(selector)
-            if elements:
-                brand_name = extractor(elements[0])
-                if brand_name:
-                    break
-
-        # Find the price using CSS selector
-        price = None
-        price_element = soup.select_one('span.PriceContainer-price')
-        if price_element:
-            price = price_element.text.strip()
-            print(f"Found price: {price}")
-        
-        if brand_name or price:
-            # Update cache
-            c.execute('''INSERT OR REPLACE INTO scrape_cache (url, brand, price, timestamp)
-                        VALUES (?, ?, ?, ?)''', (url, brand_name, price, datetime.now()))
+        # Ensure scrape_cache table exists
+        try:
+            conn = sqlite3.connect('scrape_cache.db')
+            c = conn.cursor()
+            c.execute('''CREATE TABLE IF NOT EXISTS scrape_cache
+                        (url TEXT PRIMARY KEY, brand TEXT, price TEXT, timestamp TEXT)''')
             conn.commit()
+            print("Database connection successful, table exists")
+        except sqlite3.Error as e:
+            print(f"Database error: {e}")
+            return jsonify({'error': f'Database error: {str(e)}'}), 500
+        
+        try:
+            # Check cache first
+            c.execute('SELECT brand, price, timestamp FROM scrape_cache WHERE url = ?', (url,))
+            cache_result = c.fetchone()
             
-            print(f"Found brand name: {brand_name}")
+            # Validate and potentially invalidate cache
+            if cache_result:
+                brand, cached_price, timestamp = cache_result
+                # Remove AED from cached price
+                cached_price = cached_price.replace(' AED', '').replace('AED', '').strip()
+                cache_time = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S.%f')
+                
+                # Invalidate cache if:
+                # 1. More than 6 hours old
+                # 2. Price seems unreasonably low (less than 10)
+                # 3. Price contains suspicious characters
+                if (datetime.now() - cache_time > timedelta(hours=6) or 
+                    not cached_price or 
+                    float(cached_price.replace(',', '')) < 10):
+                    print(f"Cache invalidated for {url}")
+                    cache_result = None
+                else:
+                    print(f"Cache hit for {url}")
+                    return jsonify({
+                        'brand': brand,
+                        'price': cached_price,
+                        'cached': True
+                    })
+        except sqlite3.Error as e:
+            print(f"Cache lookup error: {e}")
+            # Continue without cache if there's an error
+
+        # Make the request to the URL with a timeout and retry mechanism
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Connection': 'keep-alive',
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, timeout=10, verify=False)  # Added verify=False for testing
+            response.raise_for_status()
+            print(f"Successfully fetched URL: {url}")
+            print(f"Response status code: {response.status_code}")
+            print(f"Response headers: {response.headers}")
+        except requests.RequestException as e:
+            print(f"Request failed for {url}: {str(e)}")
+            return jsonify({'error': f'Failed to fetch URL: {str(e)}'}), 500
+        
+        # Try parsing with lxml first, fall back to html.parser if it fails
+        try:
+            soup = BeautifulSoup(response.text, 'lxml')
+            print("Successfully parsed HTML with lxml")
+        except Exception as e:
+            print(f"Failed to parse with lxml: {str(e)}")
+            try:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                print("Successfully parsed HTML with html.parser")
+            except Exception as e:
+                print(f"Failed to parse with html.parser: {str(e)}")
+                return jsonify({'error': f'Failed to parse HTML: {str(e)}'}), 500
+
+        # Print the first 1000 characters of the response for debugging
+        print(f"First 1000 chars of response: {response.text[:1000]}")
+        
+        brand_name = None
+        price = None
+        
+        try:
+            # Enhanced selectors for brand name
+            brand_selectors = [
+                # Designer/brand specific links
+                'a[href*="/designers/"], a[href*="/brands/"]',
+                'a[href*="brand="], a[href*="designer="]',
+                # Breadcrumb navigation
+                'nav.breadcrumb a, nav.breadcrumbs a, .breadcrumb a, .breadcrumbs a',
+                # Schema.org metadata
+                '[itemprop="brand"], [itemprop="manufacturer"]',
+                # Common brand containers
+                '.brand-name, .product-brand, .designer-name',
+                # Product title with brand
+                'h1.product-title, h1.title, .product-name h1',
+                # Meta tags
+                'meta[property="og:brand"]',
+                'meta[name="brand"]'
+            ]
+            
+            # Try to find brand name
+            for selector in brand_selectors:
+                try:
+                    elements = soup.select(selector)
+                    print(f"Trying selector '{selector}': found {len(elements)} elements")
+                    if elements:
+                        for element in elements:
+                            # Get text from meta tags differently
+                            if element.name == 'meta':
+                                potential_brand = element.get('content', '')
+                            else:
+                                potential_brand = element.text.strip()
+                            
+                            # Clean and validate the brand name
+                            cleaned_brand = clean_brand_name(potential_brand)
+                            if cleaned_brand and len(cleaned_brand) > 1:  # Avoid single characters
+                                brand_name = cleaned_brand
+                                print(f"Found brand name '{brand_name}' using selector '{selector}'")
+                                break
+                        if brand_name:
+                            break
+                except Exception as e:
+                    print(f"Error with selector '{selector}': {str(e)}")
+                    continue
+
+            # Enhanced selectors for price
+            price_selectors = [
+                # Specific class you mentioned
+                '.PriceContainer-slashedPrice',
+                # Common price containers
+                '.price, .product-price, .current-price',
+                '[itemprop="price"]',
+                '.price-container span',
+                '.price__current, .price-current',
+                # Sale prices
+                '.sale-price, .special-price',
+                # Main prices
+                '.main-price, .regular-price',
+                # Schema.org metadata
+                '[data-price], [data-product-price]',
+                # Specific price spans
+                'span.PriceContainer-price, span[class*="price"]'
+            ]
+            
+            # Try to find price
+            for selector in price_selectors:
+                try:
+                    elements = soup.select(selector)
+                    print(f"Trying price selector '{selector}': found {len(elements)} elements")
+                    if elements:
+                        for element in elements:
+                            # Try data attributes first, then text
+                            potential_price = element.get('data-price', element.get('content', element.text.strip()))
+                            print(f"Found potential price: {potential_price}")
+                            
+                            # Return the original price string without AED
+                            if potential_price:
+                                price = potential_price.replace(' AED', '').replace('AED', '').strip()
+                                print(f"Found price '{price}' using selector '{selector}'")
+                                break
+                        if price:
+                            break
+                except Exception as e:
+                    print(f"Error with price selector '{selector}': {str(e)}")
+                    continue
+
+        except Exception as e:
+            print(f"Error during scraping: {str(e)}")
+            return jsonify({'error': f'Scraping error: {str(e)}'}), 500
+
+        if brand_name or price:
+            try:
+                # Update cache with full price string and brand
+                c.execute('''INSERT OR REPLACE INTO scrape_cache (url, brand, price, timestamp)
+                            VALUES (?, ?, ?, ?)''', (url, brand_name, price, datetime.now()))
+                conn.commit()
+                print(f"Successfully cached data for {url}")
+            except sqlite3.Error as e:
+                print(f"Cache update error: {e}")
+                # Continue without caching if there's an error
+            
+            print(f"Successfully scraped data - Brand: {brand_name}, Price: {price}")
             return jsonify({
                 'brand': brand_name,
                 'price': price,
                 'cached': False
             })
         else:
-            print("Brand name not found")
-            return jsonify({'error': 'Brand name not found'}), 404
+            print("Brand name and price not found")
+            return jsonify({'error': 'Brand name and price not found'}), 404
 
-    except requests.RequestException as e:
-        print(f"Request error: {str(e)}")
-        return jsonify({'error': f'Failed to fetch URL: {str(e)}'}), 500
     except Exception as e:
-        print(f"General error: {str(e)}")
-        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+        print(f"Unexpected error in scrape_brand: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'An unexpected error occurred: {str(e)}'}), 500
     finally:
         if 'conn' in locals():
             conn.close()

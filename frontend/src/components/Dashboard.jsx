@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../api/axios';
 import UserManagement from './UserManagement';
 import Sidebar from './Sidebar';
 import CaseOverview from './CaseOverview';
@@ -13,8 +13,7 @@ import OrderCleaner from './OrderCleaner';
 import CaseCleaner from './CaseCleaner';
 import CombinedIdCleaner from './CombinedIdCleaner';
 import QCFailure from './QCFailure';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import EligibilityChecker from './EligibilityChecker'; // Import the new EligibilityChecker component
 
 const Dashboard = () => {
   const [activities, setActivities] = useState([]);
@@ -44,12 +43,7 @@ const Dashboard = () => {
           throw new Error('No auth token found');
         }
 
-        const response = await axios.get(`${API_URL}/api/activities`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const response = await axios.get('/api/activities');
         setActivities(response.data);
       } catch (error) {
         if (error.response?.status === 403) {
@@ -67,13 +61,9 @@ const Dashboard = () => {
 
   const handleLogout = async () => {
     try {
-      await axios.post(`${API_URL}/api/logout`, {}, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      await axios.post('/api/logout');
     } catch (error) {
-      console.error('Error logging out:', error);
+      console.error('Logout error:', error);
     } finally {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
@@ -228,12 +218,7 @@ const Dashboard = () => {
       case 'qc-failure-salesforce-query':
         return (
           <div className="bg-white shadow sm:rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium leading-6 text-gray-900">Salesforce Query</h3>
-              <div className="mt-2 max-w-xl text-sm text-gray-500">
-                <p>Salesforce Query functionality coming soon.</p>
-              </div>
-            </div>
+            <EligibilityChecker />
           </div>
         );
       case 'qc-failure-cases':

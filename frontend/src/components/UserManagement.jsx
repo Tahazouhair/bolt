@@ -1,9 +1,7 @@
 import React, { useState, useEffect, Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import axios from '../api/axios';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -24,7 +22,7 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_URL}/api/users`, {
+      const response = await axios.get('/api/users', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
@@ -47,7 +45,7 @@ const UserManagement = () => {
     try {
       if (selectedUser) {
         await axios.put(
-          `${API_URL}/api/users/${selectedUser.id}`,
+          `/api/users/${selectedUser.id}`,
           formData,
           {
             headers: {
@@ -57,7 +55,7 @@ const UserManagement = () => {
         );
         setSuccess('User updated successfully');
       } else {
-        await axios.post(`${API_URL}/api/users`, formData, {
+        await axios.post('/api/users', formData, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`
           }
@@ -83,7 +81,7 @@ const UserManagement = () => {
   const handleDelete = async () => {
     setLoading(true);
     try {
-      await axios.delete(`${API_URL}/api/users/${userToDelete.id}`, {
+      await axios.delete(`/api/users/${userToDelete.id}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }

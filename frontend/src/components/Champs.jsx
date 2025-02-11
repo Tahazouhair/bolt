@@ -1,10 +1,8 @@
 import React, { useState, useEffect, Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import axios from 'axios';
+import axios from '../api/axios';
 import { useNavigate } from 'react-router-dom';
 import ActionButton from './common/ActionButton';
-
-const API_URL = process.env.REACT_APP_API_URL;
 
 const Champs = () => {
   const navigate = useNavigate();
@@ -42,11 +40,6 @@ const Champs = () => {
     fetchUsers();
   }, [navigate]);
 
-  const getAuthHeaders = () => ({
-    Authorization: `Bearer ${localStorage.getItem('token')}`,
-    'Content-Type': 'application/json'
-  });
-
   const handleAuthError = (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
@@ -58,9 +51,7 @@ const Champs = () => {
   const fetchTeams = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_URL}/api/teams`, {
-        headers: getAuthHeaders()
-      });
+      const response = await axios.get('/api/teams');
       setTeams(response.data);
       setError('');
     } catch (error) {
@@ -74,9 +65,7 @@ const Champs = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/users`, {
-        headers: getAuthHeaders()
-      });
+      const response = await axios.get('/api/users');
       setUsers(response.data);
       setError('');
     } catch (error) {
@@ -97,17 +86,12 @@ const Champs = () => {
 
       if (selectedTeam) {
         await axios.put(
-          `${API_URL}/api/teams/${selectedTeam.id}`,
-          formData,
-          {
-            headers: getAuthHeaders()
-          }
+          `/api/teams/${selectedTeam.id}`,
+          formData
         );
         setSuccess('Team updated successfully');
       } else {
-        await axios.post(`${API_URL}/api/teams`, formData, {
-          headers: getAuthHeaders()
-        });
+        await axios.post('/api/teams', formData);
         setSuccess('Team created successfully');
       }
       setIsTeamModalOpen(false);
@@ -133,11 +117,8 @@ const Champs = () => {
     setLoading(true);
     try {
       await axios.post(
-        `${API_URL}/api/teams/${memberFormData.teamId}/members`,
-        { userId: memberFormData.userId },
-        {
-          headers: getAuthHeaders()
-        }
+        `/api/teams/${memberFormData.teamId}/members`,
+        { userId: memberFormData.userId }
       );
       setSuccess('Member added successfully');
       setIsMemberModalOpen(false);
@@ -156,10 +137,7 @@ const Champs = () => {
     setLoading(true);
     try {
       await axios.delete(
-        `${API_URL}/api/teams/${memberToRemove.teamId}/members/${memberToRemove.userId}`,
-        {
-          headers: getAuthHeaders()
-        }
+        `/api/teams/${memberToRemove.teamId}/members/${memberToRemove.userId}`
       );
       setSuccess('Member removed successfully');
       setIsRemoveMemberModalOpen(false);
@@ -220,9 +198,7 @@ const Champs = () => {
   const handleDelete = async () => {
     setLoading(true);
     try {
-      await axios.delete(`${API_URL}/api/teams/${teamToDelete.id}`, {
-        headers: getAuthHeaders()
-      });
+      await axios.delete(`/api/teams/${teamToDelete.id}`);
       setSuccess('Team deleted successfully');
       setIsDeleteModalOpen(false);
       setTeamToDelete(null);

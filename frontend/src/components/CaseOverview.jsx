@@ -2,9 +2,17 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { utils, writeFile } from 'xlsx';
 
+const API_URL = process.env.REACT_APP_API_URL;
+
 const CaseOverview = ({ initialFilter }) => {
     const [cases, setCases] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchOptions, setSearchOptions] = useState({
+        comments: true,
+        description: true,
+        subcategory: true
+    });
+    const [selectedTier2Agent, setSelectedTier2Agent] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [pageSize] = useState(50);
     const [currentPage, setCurrentPage] = useState(1);
@@ -21,6 +29,7 @@ const CaseOverview = ({ initialFilter }) => {
     });
     const [statusFilter, setStatusFilter] = useState('all');
     const [priorityFilter, setPriorityFilter] = useState(false);
+    const [orderStatusFilter, setOrderStatusFilter] = useState('all');
     const [currentUser, setCurrentUser] = useState(null);
     const [tier2Members, setTier2Members] = useState([]);
     const [supportMembers, setSupportMembers] = useState([]);
@@ -28,9 +37,82 @@ const CaseOverview = ({ initialFilter }) => {
     const [selectedAgent, setSelectedAgent] = useState('');
     const POLLING_INTERVAL = 30000; // Poll every 30 seconds
 
-    const sheetId = process.env.REACT_APP_CASES_SHEET_ID;
+    const sheetId = process.env.REACT_APP_SHEET_ID;
     const apiKey = process.env.REACT_APP_API_KEY;
     const range = 'Unassigned Cases!A1:M';
+
+    useEffect(() => {
+        // Log all environment variables to see what's available
+        console.log('All environment variables:', {
+            API_URL,
+            sheetId,
+            apiKey,
+            range,
+            NODE_ENV: process.env.NODE_ENV
+        });
+    }, []);
+
+    const fetchTeams = async () => {
+        try {
+            console.log('Fetching teams from:', `${API_URL}/api/teams`);
+            const response = await axios.get(`${API_URL}/api/teams`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            setTeams(response.data);
+        } catch (error) {
+            console.error('Error fetching teams:', error);
+        }
+    };
+
+    const fetchData = async (isBackgroundUpdate = false) => {
+        if (!isBackgroundUpdate) {
+            setIsLoading(true);
+        }
+
+        try {
+            if (!sheetId || !apiKey) {
+                console.error('Missing environment variables:', {
+                    sheetId,
+                    apiKey,
+                    range
+                });
+                throw new Error('Missing required environment variables');
+            }
+
+            const sheetsAxios = axios.create();
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
+            console.log('Fetching from URL:', url);
+            
+            const response = await sheetsAxios.get(url);
+            console.log('Google Sheets Response:', response.data);
+            
+            // Process the new data
+            const processedCases = processData(response.data);
+            
+            // Update the state with new data
+            setCases(processedCases);
+            setLastUpdate(new Date().toLocaleString());
+
+            // Cache the processed data
+            localStorage.setItem('caseOverviewData', JSON.stringify(processedCases));
+            localStorage.setItem('caseOverviewTimestamp', Date.now().toString());
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            if (!isBackgroundUpdate) {
+                // Only use cache if this is not a background update and the fetch failed
+                const cachedData = localStorage.getItem('caseOverviewData');
+                if (cachedData) {
+                    setCases(JSON.parse(cachedData));
+                }
+            }
+        } finally {
+            if (!isBackgroundUpdate) {
+                setIsLoading(false);
+            }
+        }
+    };
 
     const otherQueuesList = [
         'LM Riyadh',
@@ -97,19 +179,6 @@ const CaseOverview = ({ initialFilter }) => {
         fetchTeams();
     }, []);
 
-    const fetchTeams = async () => {
-        try {
-            const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/teams`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-            setTeams(response.data);
-        } catch (error) {
-            console.error('Error fetching teams:', error);
-        }
-    };
-
     const getUserTeam = (username) => {
         if (!username || !teams.length) return null;
         
@@ -134,7 +203,7 @@ const CaseOverview = ({ initialFilter }) => {
     useEffect(() => {
         const fetchTeamMembers = async () => {
             try {
-                const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/teams`, {
+                const response = await axios.get(`${API_URL}/api/teams`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
@@ -227,10 +296,12 @@ const CaseOverview = ({ initialFilter }) => {
     };
 
     const hasTier2Comments = (comments) => {
+        if (!comments || !Array.isArray(comments)) return false;
         return comments.some(comment => tier2Members.includes(comment.by));
     };
 
     const hasRecentTier2Comments = (comments) => {
+        if (!comments || !Array.isArray(comments)) return false;
         return comments.some(comment => 
             tier2Members.includes(comment.by) && 
             isWithinLast24Hours(comment.date)
@@ -319,42 +390,6 @@ const CaseOverview = ({ initialFilter }) => {
         return processedCases;
     };
 
-    const fetchData = async (isBackgroundUpdate = false) => {
-        if (!isBackgroundUpdate) {
-            setIsLoading(true);
-        }
-
-        try {
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
-            const response = await axios.get(url);
-            
-            // Process the new data
-            const processedCases = processData(response.data);
-            
-            // Update the state with new data
-            setCases(processedCases);
-            setLastUpdate(new Date().toLocaleString());
-
-            // Cache the processed data
-            localStorage.setItem('caseOverviewData', JSON.stringify(processedCases));
-            localStorage.setItem('caseOverviewTimestamp', Date.now().toString());
-        } catch (error) {
-            console.error('Error fetching data:', error);
-            if (!isBackgroundUpdate) {
-                // Only use cache if this is not a background update and the fetch failed
-                const cachedData = localStorage.getItem('caseOverviewData');
-                if (cachedData) {
-                    setCases(JSON.parse(cachedData));
-                }
-            }
-        } finally {
-            if (!isBackgroundUpdate) {
-                setIsLoading(false);
-            }
-        }
-    };
-
-    // Function to check if a case should be shown based on agent selection
     const shouldShowCase = useCallback((caseItem, cases) => {
         if (!selectedAgent) return true;
         
@@ -370,7 +405,6 @@ const CaseOverview = ({ initialFilter }) => {
         return true;
     }, [selectedAgent, filters.duplicates, filters.assigned]);
 
-    // Group cases by order number for duplicates view
     const groupDuplicateCases = (cases) => {
         const orderGroups = new Map();
         cases.forEach(caseItem => {
@@ -403,27 +437,32 @@ const CaseOverview = ({ initialFilter }) => {
         return duplicateGroups.flat();
     };
 
-    const filterCases = (cases) => {
+    const filterCases = useMemo(() => {
         let filteredCases = [...cases];
 
         // Apply owner filters first
-        const ownerFilterKeys = ['assigned', 'unassigned', 'otherQueues', 'myOpenCases'];
-        const activeOwnerFilters = Object.entries(filters)
-            .filter(([key, value]) => ownerFilterKeys.includes(key) && value).length;
-
-        if (activeOwnerFilters > 0) {
+        if (filters.assigned) {
             filteredCases = filteredCases.filter(caseItem => {
-                if (filters.assigned) {
-                    if ([...tier2Members, ...supportMembers].includes(caseItem.ownerName)) return true;
+                if (selectedAgent) {
+                    return caseItem.ownerName === selectedAgent;
                 }
-                if (filters.unassigned && caseItem.ownerName === 'Internal Queue') return true;
-                if (filters.otherQueues && otherQueuesList.includes(caseItem.ownerName)) return true;
-                if (filters.myOpenCases && currentUser && caseItem.ownerName === currentUser.username) return true;
-                return false;
+                return [...tier2Members, ...supportMembers].includes(caseItem.ownerName);
             });
+        } else if (filters.unassigned) {
+            filteredCases = filteredCases.filter(caseItem => 
+                caseItem.ownerName === 'Internal Queue'
+            );
+        } else if (filters.otherQueues) {
+            filteredCases = filteredCases.filter(caseItem => 
+                otherQueuesList.includes(caseItem.ownerName)
+            );
+        } else if (filters.myOpenCases && currentUser) {
+            filteredCases = filteredCases.filter(caseItem => 
+                caseItem.ownerName === currentUser.username
+            );
         }
 
-        // Apply high priority filter
+        // Apply priority filter
         if (filters.highPriority) {
             filteredCases = filteredCases.filter(caseItem => {
                 const isInternal = caseItem.feedbackType === 'Internal';
@@ -434,26 +473,40 @@ const CaseOverview = ({ initialFilter }) => {
         // Apply duplicates filter
         if (filters.duplicates) {
             filteredCases = groupDuplicateCases(filteredCases);
-        }
-
-        // Apply agent filter
-        if (selectedAgent) {
-            filteredCases = filteredCases.filter(caseItem => 
-                shouldShowCase(caseItem, cases)
-            );
+            if (selectedAgent) {
+                filteredCases = filteredCases.filter(caseItem => 
+                    caseItem.ownerName === selectedAgent
+                );
+            }
         }
 
         // Apply search filter
         if (searchQuery) {
+            const searchLower = searchQuery.toLowerCase();
+            filteredCases = filteredCases.filter(caseItem => {
+                const matchesSubcategory = searchOptions.subcategory && 
+                    caseItem.subCategory?.toLowerCase().includes(searchLower);
+                const matchesDescription = searchOptions.description && 
+                    caseItem.description?.toLowerCase().includes(searchLower);
+                const matchesComments = searchOptions.comments && 
+                    caseItem.comments?.some(comment => 
+                        comment.text.toLowerCase().includes(searchLower) ||
+                        comment.by.toLowerCase().includes(searchLower)
+                    );
+                
+                return matchesSubcategory || matchesDescription || matchesComments;
+            });
+        }
+
+        // Apply Tier 2 comment filter
+        if (selectedTier2Agent) {
             filteredCases = filteredCases.filter(caseItem =>
-                Object.values(caseItem).some(value =>
-                    String(value).toLowerCase().includes(searchQuery.toLowerCase())
-                )
+                caseItem.comments?.some(comment => comment.by === selectedTier2Agent)
             );
         }
 
         // Apply status filter
-        switch(statusFilter) {
+        switch (statusFilter) {
             case 'untouched':
                 filteredCases = filteredCases.filter(caseItem =>
                     // No comments from Tier 2 or support agents AND created more than 24 hours ago
@@ -461,6 +514,11 @@ const CaseOverview = ({ initialFilter }) => {
                         [...tier2Members, ...supportMembers].includes(comment.by)
                     ) &&
                     !isWithinLast24Hours(caseItem.createdDate)
+                );
+                break;
+            case 'new':
+                filteredCases = filteredCases.filter(caseItem =>
+                    isWithinLast24Hours(caseItem.createdDate) && !hasTier2Comments(caseItem.comments || [])
                 );
                 break;
             case 'pending':
@@ -476,13 +534,9 @@ const CaseOverview = ({ initialFilter }) => {
                     return hasTeamComments && hasNoRecentTeamComments;
                 });
                 break;
-            case 'new':
+            case 'active':
                 filteredCases = filteredCases.filter(caseItem =>
-                    // No comments from Tier 2 or support agents AND created less than 24 hours ago
-                    !caseItem.comments?.some(comment => 
-                        [...tier2Members, ...supportMembers].includes(comment.by)
-                    ) &&
-                    isWithinLast24Hours(caseItem.createdDate)
+                    hasRecentTier2Comments(caseItem.comments || [])
                 );
                 break;
             case 'priority':
@@ -490,57 +544,19 @@ const CaseOverview = ({ initialFilter }) => {
                     priorityList.includes(caseItem.priority)
                 );
                 break;
-            case 'all':
             default:
                 break;
         }
 
+        // Apply order status filter
+        if (orderStatusFilter !== 'all') {
+            filteredCases = filteredCases.filter(caseItem =>
+                caseItem.orderStatus?.toLowerCase() === orderStatusFilter.toLowerCase()
+            );
+        }
+
         return filteredCases;
-    };
-
-    const getCaseCategory = (caseItem) => {
-        if (isWithinLast24Hours(caseItem.createdDate) && !hasTier2Comments(caseItem.comments || [])) {
-            return { text: 'New Case', color: 'bg-emerald-100 text-emerald-800' };
-        }
-        if (!hasTier2Comments(caseItem.comments || [])) {
-            return { text: 'Untouched', color: 'bg-rose-100 text-rose-800' };
-        }
-        if (hasTier2Comments(caseItem.comments || []) && !hasRecentTier2Comments(caseItem.comments || [])) {
-            return { text: 'Pending', color: 'bg-amber-100 text-amber-800' };
-        }
-        return null;
-    };
-
-    const getCaseStatus = (caseItem) => {
-        if (!caseItem.comments || caseItem.comments.length === 0) {
-            return 'Untouched';
-        }
-        
-        const hasOwner = caseItem.ownerName && caseItem.ownerName.trim() !== '';
-        const hasComments = caseItem.comments.length > 0;
-        
-        if (!hasOwner && !hasComments) {
-            return 'New Case';
-        } else if (hasComments) {
-            return 'Pending';
-        }
-        
-        return 'Untouched';
-    };
-
-    const formatDate = (dateStr) => {
-        if (!dateStr) return '';
-        const date = new Date(dateStr);
-        const options = { 
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-        };
-        return date.toLocaleString('en-US', options);
-    };
+    }, [cases, searchQuery, searchOptions, filters, selectedAgent, statusFilter, orderStatusFilter, currentUser, otherQueuesList, priorityList, tier2Members, supportMembers, selectedTier2Agent]);
 
     const getPaginatedCases = (cases) => {
         const startIndex = (currentPage - 1) * pageSize;
@@ -549,7 +565,7 @@ const CaseOverview = ({ initialFilter }) => {
 
     const handleSelectAll = (event) => {
         if (event.target.checked) {
-            const allCaseIds = filteredCases.map(caseItem => caseItem.caseNumber);
+            const allCaseIds = filterCases.map(caseItem => caseItem.caseNumber);
             setSelectedCases(new Set(allCaseIds));
         } else {
             setSelectedCases(new Set());
@@ -618,8 +634,51 @@ const CaseOverview = ({ initialFilter }) => {
         };
     }, [tier2Members, supportMembers]);
 
-    const filteredCases = filterCases(cases);
-    const paginatedCases = getPaginatedCases(filteredCases);
+    const paginatedCases = getPaginatedCases(filterCases);
+
+    const getCaseCategory = (caseItem) => {
+        if (isWithinLast24Hours(caseItem.createdDate) && !hasTier2Comments(caseItem.comments || [])) {
+            return { text: 'New Case', color: 'bg-emerald-100 text-emerald-800' };
+        }
+        if (!hasTier2Comments(caseItem.comments || [])) {
+            return { text: 'Untouched', color: 'bg-rose-100 text-rose-800' };
+        }
+        if (hasTier2Comments(caseItem.comments || []) && !hasRecentTier2Comments(caseItem.comments || [])) {
+            return { text: 'Pending', color: 'bg-amber-100 text-amber-800' };
+        }
+        return null;
+    };
+
+    const getCaseStatus = (caseItem) => {
+        if (!caseItem.comments || caseItem.comments.length === 0) {
+            return 'Untouched';
+        }
+        
+        const hasOwner = caseItem.ownerName && caseItem.ownerName.trim() !== '';
+        const hasComments = caseItem.comments.length > 0;
+        
+        if (!hasOwner && !hasComments) {
+            return 'New Case';
+        } else if (hasComments) {
+            return 'Pending';
+        }
+        
+        return 'Untouched';
+    };
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        const options = { 
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        };
+        return date.toLocaleString('en-US', options);
+    };
 
     // Add styles to document head instead of using style tag
     React.useEffect(() => {
@@ -724,7 +783,7 @@ const CaseOverview = ({ initialFilter }) => {
                         <div className="flex items-center">
                             <h1 className="text-2xl font-semibold text-gray-900">Case Overview</h1>
                             <span className="ml-3 inline-flex items-center justify-center h-6 px-3 text-sm font-medium rounded-full bg-blue-100 text-blue-800 translate-y-[1px]">
-                                {filteredCases.length} {filteredCases.length === 1 ? 'case' : 'cases'}
+                                {filterCases.length} {filterCases.length === 1 ? 'case' : 'cases'}
                             </span>
                         </div>
                         <div className="space-x-2">
@@ -843,15 +902,153 @@ const CaseOverview = ({ initialFilter }) => {
                                 </svg>
                             </span>
                         </div>
+                        <div className="flex items-center justify-between px-1">
+                            <div className="flex items-center gap-6">
+                                <label className="flex items-center space-x-2 text-sm text-gray-600 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={searchOptions.comments}
+                                        onChange={(e) => setSearchOptions(prev => ({
+                                            ...prev,
+                                            comments: e.target.checked
+                                        }))}
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span>Comments</span>
+                                </label>
+                                <label className="flex items-center space-x-2 text-sm text-gray-600 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={searchOptions.description}
+                                        onChange={(e) => setSearchOptions(prev => ({
+                                            ...prev,
+                                            description: e.target.checked
+                                        }))}
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span>Case Description</span>
+                                </label>
+                                <label className="flex items-center space-x-2 text-sm text-gray-600 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={searchOptions.subcategory}
+                                        onChange={(e) => setSearchOptions(prev => ({
+                                            ...prev,
+                                            subcategory: e.target.checked
+                                        }))}
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span>Sub Category</span>
+                                </label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <select
+                                    value={selectedTier2Agent}
+                                    onChange={(e) => setSelectedTier2Agent(e.target.value)}
+                                    className="h-9 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-sm rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 cursor-pointer min-w-[160px]"
+                                >
+                                    <option value="">Filter by Tier 2 Comments</option>
+                                    {tier2Members.map((member) => (
+                                        <option key={member} value={member}>
+                                            {member}
+                                        </option>
+                                    ))}
+                                </select>
+                                {selectedTier2Agent && (
+                                    <button
+                                        onClick={() => setSelectedTier2Agent('')}
+                                        className="p-1 text-gray-400 hover:text-gray-600"
+                                        title="Clear selection"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     </div>
                     
+                    <div className="flex flex-wrap gap-2 mt-2 mb-6">
+                        <button
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                                orderStatusFilter === 'all'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                            onClick={() => setOrderStatusFilter('all')}
+                        >
+                            All
+                        </button>
+                        <button
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                                orderStatusFilter === 'Return Completed'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                            onClick={() => setOrderStatusFilter('Return Completed')}
+                        >
+                            Return Completed
+                        </button>
+                        <button
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                                orderStatusFilter === 'RMA-Authorized'
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                            onClick={() => setOrderStatusFilter('RMA-Authorized')}
+                        >
+                            RMA-Authorized
+                        </button>
+                        <button
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                                orderStatusFilter === 'RMA-Approved'
+                                    ? 'bg-orange-100 text-orange-700'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                            onClick={() => setOrderStatusFilter('RMA-Approved')}
+                        >
+                            RMA-Approved
+                        </button>
+                        <button
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                                orderStatusFilter === 'Shipping Dispatched'
+                                    ? 'bg-indigo-100 text-indigo-700'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                            onClick={() => setOrderStatusFilter('Shipping Dispatched')}
+                        >
+                            Shipping Dispatched
+                        </button>
+                        <button
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                                orderStatusFilter === 'Closed'
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                            onClick={() => setOrderStatusFilter('Closed')}
+                        >
+                            Closed
+                        </button>
+                        <button
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                                orderStatusFilter === 'Processing - Distributed'
+                                    ? 'bg-purple-100 text-purple-700'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                            onClick={() => setOrderStatusFilter('Processing - Distributed')}
+                        >
+                            Processing - Distributed
+                        </button>
+                    </div>
+
                     <div className="overflow-x-auto border rounded-lg shadow">
                         <div className="inline-block min-w-full align-middle">
                             <div className="px-4 py-2 bg-white border-b flex justify-between items-center">
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="checkbox"
-                                        checked={selectedCases.size > 0 && selectedCases.size === filteredCases.length}
+                                        checked={selectedCases.size > 0 && selectedCases.size === filterCases.length}
                                         onChange={handleSelectAll}
                                         className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                                     />
@@ -914,7 +1111,7 @@ const CaseOverview = ({ initialFilter }) => {
                                                 Loading...
                                             </td>
                                         </tr>
-                                    ) : filteredCases.length === 0 ? (
+                                    ) : filterCases.length === 0 ? (
                                         <tr>
                                             <td colSpan="5" className="px-3 py-2 text-center text-sm text-gray-500">
                                                 No cases found
@@ -1116,7 +1313,7 @@ const CaseOverview = ({ initialFilter }) => {
                     </div>
 
                     {/* Pagination Controls */}
-                    {filteredCases.length > pageSize && (
+                    {filterCases.length > pageSize && (
                         <div className="mt-4 flex justify-center space-x-2">
                             <button
                                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
@@ -1126,11 +1323,11 @@ const CaseOverview = ({ initialFilter }) => {
                                 Previous
                             </button>
                             <span className="px-4 py-2 text-sm font-medium text-gray-700">
-                                Page {currentPage} of {Math.ceil(filteredCases.length / pageSize)}
+                                Page {currentPage} of {Math.ceil(filterCases.length / pageSize)}
                             </span>
                             <button
-                                onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredCases.length / pageSize), prev + 1))}
-                                disabled={currentPage >= Math.ceil(filteredCases.length / pageSize)}
+                                onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filterCases.length / pageSize), prev + 1))}
+                                disabled={currentPage >= Math.ceil(filterCases.length / pageSize)}
                                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Next

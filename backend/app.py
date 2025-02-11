@@ -36,8 +36,21 @@ if os.environ.get('DATABASE_URL'):
     database_url = os.environ.get('DATABASE_URL')
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    
+    # Add SSL mode and other required parameters
+    if '?' not in database_url:
+        database_url += '?sslmode=require'
+    
+    print(f"Using PostgreSQL database URL (masked): {database_url.split('@')[0]}@****")
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    print(f"Using PostgreSQL database: {database_url}")
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+        'connect_args': {
+            'sslmode': 'require',
+            'connect_timeout': 10
+        }
+    }
 else:
     # Development SQLite database
     sqlite_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard.db')
@@ -45,10 +58,6 @@ else:
     print(f"Using SQLite database: {sqlite_path}")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,
-}
 
 # Initialize extensions
 print("Initializing database...")
